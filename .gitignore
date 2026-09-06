@@ -1,0 +1,41 @@
+# Android & Gradle
+*.iml
+.gradle/
+.gradle-user-home/
+/local.properties
+local.properties
+build/
+*/build/
+captures/
+.externalNativeBuild/
+.cxx/
+.kotlin/
+
+# IDE & Editors
+.idea/
+*.iws
+*.out
+
+# Python & Virtual Environments
+.venv/
+venv/
+ENV/
+env/
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# OS specific
+.DS_Store
+Thumbs.db
+
+# Node / Next.js
+node_modules/
+.next/
+
+# Large datasets & training runs
+datasets/
+runs/
+
+

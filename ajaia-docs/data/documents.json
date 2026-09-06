@@ -1,0 +1,105 @@
+[
+  {
+    "id": "test-doc-1788523709364",
+    "title": "Automated CI Test Document",
+    "content": "<h1>Integration Test</h1><p>Verifying full-stack functionality.</p>",
+    "ownerId": "user_vaibhavi",
+    "ownerName": "Vaibhavi Diwakar",
+    "ownerEmail": "taniyadiwaker6@gmail.com",
+    "collaborators": [
+      {
+        "userId": "user_jordan",
+        "email": "jordan.taylor@ajaia.io",
+        "name": "Jordan Taylor",
+        "role": "editor",
+        "addedAt": "2026-09-04T12:08:29.369Z"
+      }
+    ],
+    "createdAt": "2026-09-04T12:08:29.364Z",
+    "updatedAt": "2026-09-04T12:08:29.366Z",
+    "wordCount": 5,
+    "characterCount": 42,
+    "revisions": [
+      {
+        "id": "rev-1788523709366",
+        "timestamp": "2026-09-04T12:08:29.366Z",
+        "title": "Automated CI Test Document",
+        "content": "<h1>Integration Test</h1><p>Verifying full-stack functionality.</p>",
+        "savedByUserId": "user_vaibhavi",
+        "savedByName": "Vaibhavi Diwakar",
+        "summary": "Initial draft created"
+      }
+    ]
+  },
+  {
+    "id": "test-doc-1788523474100",
+    "title": "Automated CI Test Document",
+    "content": "<h1>Integration Test</h1><p>Verifying full-stack functionality.</p>",
+    "ownerId": "user_vaibhavi",
+    "ownerName": "Vaibhavi Diwakar",
+    "ownerEmail": "taniyadiwaker6@gmail.com",
+    "collaborators": [
+      {
+        "userId": "user_jordan",
+        "email": "jordan.taylor@ajaia.io",
+        "name": "Jordan Taylor",
+        "role": "editor",
+        "addedAt": "2026-09-04T12:04:34.106Z"
+      }
+    ],
+    "createdAt": "2026-09-04T12:04:34.100Z",
+    "updatedAt": "2026-09-04T12:04:34.100Z",
+    "wordCount": 5,
+    "characterCount": 42,
+    "revisions": [
+      {
+        "id": "rev-1788523474100",
+        "timestamp": "2026-09-04T12:04:34.100Z",
+        "title": "Automated CI Test Document",
+        "content": "<h1>Integration Test</h1><p>Verifying full-stack functionality.</p>",
+        "savedByUserId": "user_vaibhavi",
+        "savedByName": "Vaibhavi Diwakar",
+        "summary": "Initial draft created"
+      }
+    ]
+  },
+  {
+    "id": "doc-seed-1",
+    "title": "Product Requirements: AI Collaborative Workspace",
+    "content": "<h1>Product Requirements</h1><p>Seeded PRD.</p>",
+    "ownerId": "user_vaibhavi",
+    "ownerName": "Vaibhavi Diwakar",
+    "ownerEmail": "taniyadiwaker6@gmail.com",
+    "collaborators": [
+      {
+        "userId": "user_alex",
+        "email": "alex.chen@ajaia.io",
+        "name": "Alex Chen",
+        "role": "editor",
+        "addedAt": "2026-09-04T12:04:34.094Z"
+      },
+      {
+        "userId": "user_sarah",
+        "email": "sarah.miller@ajaia.io",
+        "name": "Sarah Miller",
+        "role": "viewer",
+        "addedAt": "2026-09-04T12:04:34.095Z"
+      }
+    ],
+    "createdAt": "2026-09-04T12:04:34.095Z",
+    "updatedAt": "2026-09-04T12:04:34.095Z",
+    "wordCount": 20,
+    "characterCount": 150,
+    "revisions": [
+      {
+        "id": "rev-1",
+        "timestamp": "2026-09-04T12:04:34.095Z",
+        "title": "Product Requirements: AI Collaborative Workspace",
+        "content": "<h1>Product Requirements</h1><p>Seeded PRD.</p>",
+        "savedByUserId": "user_vaibhavi",
+        "savedByName": "Vaibhavi Diwakar",
+        "summary": "Initial draft"
+      }
+    ]
+  }
+]

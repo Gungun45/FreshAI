@@ -1,0 +1,20 @@
+﻿[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "freshai"
+version = "0.1.0"
+description = "FreshAI Produce Lifecycle and Freshness Platform"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "ultralytics>=8.3.0",
+    "streamlit>=1.38.0",
+    "opencv-python>=4.10.0",
+    "pillow>=10.0.0",
+    "pandas>=2.2.0",
+    "numpy>=1.26.0",
+    "matplotlib>=3.9.0",
+    "requests>=2.32.0",
+]

@@ -1,0 +1,11 @@
+path: C:\Users\taniy\AndroidStudioProjects\FreshAI\tests\demo_dataset
+train: images/train
+val: images/val
+test: images/test
+names:
+  0: Tomato
+  1: Apple
+  2: Growing_Fruit
+  3: Bell_Pepper
+  4: Plant_Leaf
+nc: 5

@@ -1,0 +1,22 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="fresh_primary">#15803D</color>
+    <color name="fresh_primary_dark">#166534</color>
+    <color name="fresh_primary_light">#DCFCE7</color>
+    <color name="fresh_accent">#F59E0B</color>
+    <color name="fresh_bg">#F8FAFC</color>
+    <color name="fresh_surface">#FFFFFF</color>
+    <color name="fresh_card_border">#E2E8F0</color>
+    <color name="fresh_text_primary">#0F172A</color>
+    <color name="fresh_text_secondary">#64748B</color>
+    
+    <!-- Produce tag colors -->
+    <color name="tag_tomato">#EF4444</color>
+    <color name="tag_apple">#DC2626</color>
+    <color name="tag_banana">#EAB308</color>
+    <color name="tag_orange">#F97316</color>
+    <color name="tag_plant">#22C55E</color>
+
+    <color name="black">#000000</color>
+    <color name="white">#FFFFFF</color>
+</resources>
