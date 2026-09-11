@@ -38,4 +38,8 @@ node_modules/
 datasets/
 runs/
 
+# Temporary / scratch files & unrelated projects
+Crop1.kt
+sv-seo-tools/
+
 

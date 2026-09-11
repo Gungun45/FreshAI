@@ -1,4 +1,4 @@
-﻿<resources xmlns:tools="http://schemas.android.com/tools">
+<resources xmlns:tools="http://schemas.android.com/tools">
     <!-- Base application theme with NoActionBar to prevent double header -->
     <style name="Theme.FreshAI" parent="Theme.MaterialComponents.DayNight.NoActionBar">
         <!-- Primary brand color. -->
@@ -10,7 +10,7 @@
         <item name="colorSecondaryVariant">#D97706</item>
         <item name="colorOnSecondary">@color/white</item>
         <!-- Status bar color. -->
-        <item name="android:statusBarColor">@color/fresh_primary_dark</item>
+        <item name="android:statusBarColor">@color/fresh_primary</item>
         <item name="android:windowLightStatusBar" tools:targetApi="m">false</item>
         <item name="android:windowBackground">@color/fresh_bg</item>
     </style>

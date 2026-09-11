@@ -6,10 +6,9 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:fitsSystemWindows="true"
     android:background="#F8FAFC">
 
-    <!-- Top App Bar with System Insets Support -->
+    <!-- 1. Top App Bar (covers status bar with primary green) -->
     <com.google.android.material.appbar.MaterialToolbar
         android:id="@+id/topAppBar"
         android:layout_width="match_parent"
@@ -45,42 +44,52 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Produce Freshness &amp; Post-Harvest Intelligence"
+                    android:text="Produce Quality, Shelf Life &amp; Plant Growth"
                     android:textColor="#DCFCE7"
-                    android:textSize="12sp" />
+                    android:textSize="11.5sp" />
+
             </LinearLayout>
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnConfigIp"
                 style="@style/Widget.MaterialComponents.Button.TextButton"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
+                android:layout_width="42dp"
+                android:layout_height="42dp"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                android:insetLeft="0dp"
+                android:insetRight="0dp"
+                app:cornerRadius="21dp"
                 app:icon="@android:drawable/ic_menu_preferences"
+                app:iconGravity="textStart"
+                app:iconPadding="0dp"
                 app:iconTint="#FFFFFF" />
 
         </LinearLayout>
 
     </com.google.android.material.appbar.MaterialToolbar>
 
-    <!-- Mode Selector Tabs -->
+    <!-- 2. Dual Mode Navigation Tabs: Produce Freshness vs Scan Plant Growth -->
     <com.google.android.material.tabs.TabLayout
         android:id="@+id/tabLayout"
         android:layout_width="match_parent"
-        android:layout_height="46dp"
+        android:layout_height="50dp"
         android:background="#FFFFFF"
+        android:elevation="2dp"
         app:tabIndicatorColor="#15803D"
+        app:tabIndicatorHeight="3.5dp"
         app:tabSelectedTextColor="#15803D"
         app:tabTextColor="#64748B">
 
         <com.google.android.material.tabs.TabItem
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="📱 Scanner Studio" />
+            android:text="🍎 Produce Freshness" />
 
         <com.google.android.material.tabs.TabItem
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="🌐 Web Dashboard" />
+            android:text="🌱 Scan Plant Growth" />
 
     </com.google.android.material.tabs.TabLayout>
 
@@ -90,405 +99,565 @@
         android:layout_width="match_parent"
         android:layout_height="4dp"
         android:indeterminate="true"
+        android:progressTint="#22C55E"
         android:visibility="gone" />
 
-    <!-- Main Container Frame -->
-    <FrameLayout
+    <!-- 3. Studio Workspace View -->
+    <ScrollView
+        android:id="@+id/studioView"
         android:layout_width="match_parent"
-        android:layout_height="match_parent">
+        android:layout_height="match_parent"
+        android:fillViewport="true"
+        android:overScrollMode="never"
+        android:paddingStart="14dp"
+        android:paddingTop="10dp"
+        android:paddingEnd="14dp"
+        android:paddingBottom="16dp">
 
-        <!-- 1. Native Detection Studio View -->
-        <ScrollView
-            android:id="@+id/studioView"
+        <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:fillViewport="true"
-            android:padding="16dp">
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
 
+            <!-- Dynamic Header Badge Banner -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical">
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
 
-                <!-- Stage Badge -->
                 <TextView
                     android:id="@+id/tvStudioBadge"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:background="@drawable/badge_step_bg"
-                    android:paddingStart="12dp"
+                    android:paddingStart="10dp"
                     android:paddingTop="4dp"
-                    android:paddingEnd="12dp"
+                    android:paddingEnd="10dp"
                     android:paddingBottom="4dp"
-                    android:text="STEP 1 • AI SCANNER"
+                    android:text="🍎 PRODUCE QUALITY &amp; SHELF-LIFE SCANNER"
                     android:textColor="#166534"
-                    android:textSize="11sp"
+                    android:textSize="10.5sp"
                     android:textStyle="bold" />
 
-                <!-- Scan Target Mode Selector Card -->
-                <com.google.android.material.card.MaterialCardView
-                    android:id="@+id/cardScanModeSelector"
+                <View
+                    android:layout_width="0dp"
+                    android:layout_height="1dp"
+                    android:layout_weight="1" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="🟢 Offline Ready"
+                    android:textColor="#16A34A"
+                    android:textSize="10.5sp"
+                    android:textStyle="bold" />
+
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/tvScanModeHint"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="5dp"
+                android:layout_marginBottom="6dp"
+                android:text="💡 Point camera or pick photo to evaluate freshness %, quality score, remaining shelf life, and storage strategy."
+                android:textColor="#64748B"
+                android:textSize="11sp" />
+
+            <!-- Viewfinder / Image Canvas (Enlarged for clear detection & HUD visibility) -->
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="300dp"
+                app:cardCornerRadius="14dp"
+                app:cardElevation="1dp"
+                app:strokeColor="#CBD5E1"
+                app:strokeWidth="1dp">
+
+                <FrameLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:background="#F1F5F9">
+
+                    <ImageView
+                        android:id="@+id/ivPreview"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:scaleType="fitCenter" />
+
+                    <com.example.freshai.BoundingBoxOverlayView
+                        android:id="@+id/boxOverlay"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent" />
+
+                    <LinearLayout
+                        android:id="@+id/placeholderLayout"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="center"
+                        android:gravity="center"
+                        android:orientation="vertical"
+                        android:padding="14dp">
+
+                        <TextView
+                            android:id="@+id/tvPlaceholderEmoji"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="🍅 🧄 🥔 🥒"
+                            android:textSize="36sp" />
+
+                        <TextView
+                            android:id="@+id/tvPlaceholderTitle"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:text="Capture or Choose Produce / Plant"
+                            android:textColor="#0F172A"
+                            android:textSize="14sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:id="@+id/tvPlaceholderSub"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="3dp"
+                            android:text="AI detects produce, defect %, shelf life &amp; growth stage"
+                            android:textColor="#64748B"
+                            android:textSize="11.5sp" />
+
+                    </LinearLayout>
+
+                    <!-- Real-time Device Hardware Sensor Telemetry HUD -->
+                    <LinearLayout
+                        android:id="@+id/layoutSensorHud"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="top"
+                        android:background="#990F172A"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:paddingStart="10dp"
+                        android:paddingTop="5dp"
+                        android:paddingEnd="10dp"
+                        android:paddingBottom="5dp">
+
+                        <TextView
+                            android:id="@+id/tvSensorLux"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="☀️ 520 Lux (Optimal)"
+                            android:textColor="#38BDF8"
+                            android:textSize="9.5sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:id="@+id/tvSensorTemp"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="🌡️ 24.5°C (Ambient)"
+                            android:textColor="#4ADE80"
+                            android:textSize="9.5sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:id="@+id/tvSensorStability"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="🎯 Lens: Stable"
+                            android:textColor="#FDE047"
+                            android:textSize="9.5sp"
+                            android:textStyle="bold" />
+
+                    </LinearLayout>
+
+                </FrameLayout>
+
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- Action Buttons: Camera & Gallery -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:orientation="horizontal">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnCamera"
+                    android:layout_width="0dp"
+                    android:layout_height="44dp"
+                    android:layout_marginEnd="4dp"
+                    android:layout_weight="1"
+                    android:backgroundTint="#15803D"
+                    android:text="📷 Camera"
+                    android:textColor="#FFFFFF"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    android:insetBottom="0dp"
+                    android:insetTop="0dp"
+                    app:cornerRadius="10dp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnGallery"
+                    android:layout_width="0dp"
+                    android:layout_height="44dp"
+                    android:layout_marginStart="4dp"
+                    android:layout_weight="1"
+                    android:backgroundTint="#FFFFFF"
+                    android:text="🖼️ Gallery"
+                    android:textColor="#15803D"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    android:insetBottom="0dp"
+                    android:insetTop="0dp"
+                    app:cornerRadius="10dp"
+                    app:strokeColor="#15803D"
+                    app:strokeWidth="1.5dp" />
+
+            </LinearLayout>
+
+            <!-- Quick Smart Agronomy & AI Tool Strip -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:orientation="horizontal">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnCropLibrary"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    android:layout_width="0dp"
+                    android:layout_height="38dp"
+                    android:layout_marginEnd="2dp"
+                    android:layout_weight="1"
+                    android:insetTop="0dp"
+                    android:insetBottom="0dp"
+                    android:insetLeft="0dp"
+                    android:insetRight="0dp"
+                    android:paddingStart="2dp"
+                    android:paddingEnd="2dp"
+                    android:text="📚 Library"
+                    android:textColor="#15803D"
+                    android:textSize="10sp"
+                    android:textStyle="bold"
+                    android:singleLine="true"
+                    android:maxLines="1"
+                    android:gravity="center"
+                    app:cornerRadius="8dp"
+                    app:strokeColor="#86EFAC"
+                    app:strokeWidth="1dp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnPlantDoctor"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    android:layout_width="0dp"
+                    android:layout_height="38dp"
+                    android:layout_marginStart="2dp"
+                    android:layout_marginEnd="2dp"
+                    android:layout_weight="1"
+                    android:insetTop="0dp"
+                    android:insetBottom="0dp"
+                    android:insetLeft="0dp"
+                    android:insetRight="0dp"
+                    android:paddingStart="2dp"
+                    android:paddingEnd="2dp"
+                    android:text="🩺 Doctor"
+                    android:textColor="#0284C7"
+                    android:textSize="10sp"
+                    android:textStyle="bold"
+                    android:singleLine="true"
+                    android:maxLines="1"
+                    android:gravity="center"
+                    app:cornerRadius="8dp"
+                    app:strokeColor="#BAE6FD"
+                    app:strokeWidth="1dp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnHarvestTimeline"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    android:layout_width="0dp"
+                    android:layout_height="38dp"
+                    android:layout_marginStart="2dp"
+                    android:layout_marginEnd="2dp"
+                    android:layout_weight="1"
+                    android:insetTop="0dp"
+                    android:insetBottom="0dp"
+                    android:insetLeft="0dp"
+                    android:insetRight="0dp"
+                    android:paddingStart="2dp"
+                    android:paddingEnd="2dp"
+                    android:text="🗓️ Timeline"
+                    android:textColor="#D97706"
+                    android:textSize="10sp"
+                    android:textStyle="bold"
+                    android:singleLine="true"
+                    android:maxLines="1"
+                    android:gravity="center"
+                    app:cornerRadius="8dp"
+                    app:strokeColor="#FDE68A"
+                    app:strokeWidth="1dp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnExportReport"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    android:layout_width="0dp"
+                    android:layout_height="38dp"
+                    android:layout_marginStart="2dp"
+                    android:layout_weight="1"
+                    android:insetTop="0dp"
+                    android:insetBottom="0dp"
+                    android:insetLeft="0dp"
+                    android:insetRight="0dp"
+                    android:paddingStart="2dp"
+                    android:paddingEnd="2dp"
+                    android:text="📄 Share"
+                    android:textColor="#7C3AED"
+                    android:textSize="10sp"
+                    android:textStyle="bold"
+                    android:singleLine="true"
+                    android:maxLines="1"
+                    android:gravity="center"
+                    app:cornerRadius="8dp"
+                    app:strokeColor="#DDD6FE"
+                    app:strokeWidth="1dp" />
+
+            </LinearLayout>
+
+            <!-- Quick Plant / Crop Selector Strip (Visible in Scan Plant mode) -->
+            <LinearLayout
+                android:id="@+id/layoutCropSelector"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="🌱 Quick Crop Cultivation Profiles:"
+                    android:textColor="#334155"
+                    android:textSize="11sp"
+                    android:textStyle="bold"
+                    android:layout_marginBottom="4dp" />
+
+                <HorizontalScrollView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:layout_marginBottom="12dp"
-                    app:cardBackgroundColor="#F8FAFC"
-                    app:cardCornerRadius="14dp"
-                    app:cardElevation="1dp"
-                    app:strokeColor="#CBD5E1"
+                    android:scrollbars="none"
+                    android:overScrollMode="never">
+
+                    <com.google.android.material.chip.ChipGroup
+                        android:id="@+id/chipGroupCrops"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        app:singleSelection="true"
+                        app:singleLine="true" />
+
+                </HorizontalScrollView>
+
+            </LinearLayout>
+
+            <!-- KPI Analytics 3-Tile Row -->
+            <LinearLayout
+                android:id="@+id/kpiRow"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:orientation="horizontal">
+
+                <!-- Tile 1: Items -->
+                <com.google.android.material.card.MaterialCardView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="3dp"
+                    android:layout_weight="1"
+                    app:cardBackgroundColor="#F0FDF4"
+                    app:cardCornerRadius="10dp"
+                    app:strokeColor="#BBF7D0"
                     app:strokeWidth="1dp">
 
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
+                        android:gravity="center"
                         android:orientation="vertical"
-                        android:padding="12dp">
+                        android:padding="8dp">
 
                         <TextView
+                            android:id="@+id/tvKpiTotal"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="🔍 SCANNER TARGET MODE"
-                            android:textColor="#475569"
-                            android:textSize="10.5sp"
+                            android:text="0"
+                            android:textColor="#166534"
+                            android:textSize="18sp"
                             android:textStyle="bold" />
 
-                        <RadioGroup
-                            android:id="@+id/rgScanMode"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="6dp"
-                            android:orientation="horizontal">
-
-                            <RadioButton
-                                android:id="@+id/rbModeProduce"
-                                android:layout_width="0dp"
-                                android:layout_height="wrap_content"
-                                android:layout_weight="1"
-                                android:checked="true"
-                                android:buttonTint="#15803D"
-                                android:text="🍎 Produce Freshness\n(Quality &amp; Shelf Life)"
-                                android:textColor="#1E293B"
-                                android:textSize="11sp"
-                                android:textStyle="bold" />
-
-                            <RadioButton
-                                android:id="@+id/rbModeCropPlant"
-                                android:layout_width="0dp"
-                                android:layout_height="wrap_content"
-                                android:layout_weight="1"
-                                android:buttonTint="#15803D"
-                                android:text="🌱 Crop &amp; Plant Growth\n(Time to Grow / Harvest)"
-                                android:textColor="#15803D"
-                                android:textSize="11sp"
-                                android:textStyle="bold" />
-                        </RadioGroup>
-
                         <TextView
-                            android:id="@+id/tvScanModeHint"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="6dp"
-                            android:text="💡 Produce Mode: Analyzes freshness %, quality score, remaining shelf life, and storage strategy."
-                            android:textColor="#64748B"
-                            android:textSize="10.5sp" />
-
+                            android:text="Items"
+                            android:textColor="#15803D"
+                            android:textSize="10sp"
+                            android:textStyle="bold" />
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 
-                <!-- Image Preview / Detection Canvas -->
+                <!-- Tile 2: Classes -->
                 <com.google.android.material.card.MaterialCardView
-                    android:layout_width="match_parent"
-                    android:layout_height="260dp"
-                    android:layout_marginTop="12dp"
-                    app:cardCornerRadius="16dp"
-                    app:cardElevation="2dp"
-                    app:strokeColor="#E2E8F0"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="2dp"
+                    android:layout_marginEnd="2dp"
+                    android:layout_weight="1"
+                    app:cardBackgroundColor="#EFF6FF"
+                    app:cardCornerRadius="10dp"
+                    app:strokeColor="#BFDBFE"
                     app:strokeWidth="1dp">
-
-                    <FrameLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="match_parent"
-                        android:background="#F1F5F9">
-
-                        <ImageView
-                            android:id="@+id/ivPreview"
-                            android:layout_width="match_parent"
-                            android:layout_height="match_parent"
-                            android:scaleType="fitCenter" />
-
-                        <com.example.freshai.BoundingBoxOverlayView
-                            android:id="@+id/boxOverlay"
-                            android:layout_width="match_parent"
-                            android:layout_height="match_parent" />
-
-                        <LinearLayout
-                            android:id="@+id/placeholderLayout"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_gravity="center"
-                            android:gravity="center"
-                            android:orientation="vertical">
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="🍅 🥦 🍎"
-                                android:textSize="36sp" />
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:layout_marginTop="8dp"
-                                android:text="Capture or choose produce image"
-                                android:textColor="#64748B"
-                                android:textSize="14sp"
-                                android:textStyle="bold" />
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:layout_marginTop="2dp"
-                                android:text="YOLO AI will detect objects, boxes &amp; confidence"
-                                android:textColor="#94A3B8"
-                                android:textSize="12sp" />
-
-                        </LinearLayout>
-
-                    </FrameLayout>
-
-                </com.google.android.material.card.MaterialCardView>
-
-                <!-- Action Buttons Row -->
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="14dp"
-                    android:orientation="horizontal">
-
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btnCamera"
-                        android:layout_width="0dp"
-                        android:layout_height="44dp"
-                        android:layout_marginEnd="6dp"
-                        android:layout_weight="1"
-                        android:backgroundTint="#15803D"
-                        android:text="📷 Camera"
-                        android:textColor="#FFFFFF"
-                        android:textSize="13sp"
-                        android:textStyle="bold"
-                        android:insetBottom="0dp"
-                        android:insetTop="0dp"
-                        app:cornerRadius="10dp" />
-
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btnGallery"
-                        android:layout_width="0dp"
-                        android:layout_height="44dp"
-                        android:layout_marginStart="6dp"
-                        android:layout_weight="1"
-                        android:backgroundTint="#FFFFFF"
-                        android:text="🖼️ Gallery"
-                        android:textColor="#15803D"
-                        android:textSize="13sp"
-                        android:textStyle="bold"
-                        android:insetBottom="0dp"
-                        android:insetTop="0dp"
-                        app:cornerRadius="10dp"
-                        app:strokeColor="#15803D"
-                        app:strokeWidth="1.5dp" />
-
-                </LinearLayout>
-
-                <!-- KPI Analytics Row -->
-                <LinearLayout
-                    android:id="@+id/kpiRow"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="14dp"
-                    android:orientation="horizontal">
-
-                    <!-- Card 1: Items -->
-                    <com.google.android.material.card.MaterialCardView
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginEnd="4dp"
-                        android:layout_weight="1"
-                        app:cardBackgroundColor="#F0FDF4"
-                        app:cardCornerRadius="12dp"
-                        app:strokeColor="#BBF7D0"
-                        app:strokeWidth="1dp">
-
-                        <LinearLayout
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:gravity="center"
-                            android:orientation="vertical"
-                            android:padding="10dp">
-
-                            <TextView
-                                android:id="@+id/tvKpiTotal"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="0"
-                                android:textColor="#166534"
-                                android:textSize="20sp"
-                                android:textStyle="bold" />
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="Total Items"
-                                android:textColor="#4B5563"
-                                android:textSize="10sp" />
-                        </LinearLayout>
-                    </com.google.android.material.card.MaterialCardView>
-
-                    <!-- Card 2: Classes -->
-                    <com.google.android.material.card.MaterialCardView
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="4dp"
-                        android:layout_marginEnd="4dp"
-                        android:layout_weight="1"
-                        app:cardBackgroundColor="#F0FDF4"
-                        app:cardCornerRadius="12dp"
-                        app:strokeColor="#BBF7D0"
-                        app:strokeWidth="1dp">
-
-                        <LinearLayout
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:gravity="center"
-                            android:orientation="vertical"
-                            android:padding="10dp">
-
-                            <TextView
-                                android:id="@+id/tvKpiClasses"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="0"
-                                android:textColor="#166534"
-                                android:textSize="20sp"
-                                android:textStyle="bold" />
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="Classes"
-                                android:textColor="#4B5563"
-                                android:textSize="10sp" />
-                        </LinearLayout>
-                    </com.google.android.material.card.MaterialCardView>
-
-                    <!-- Card 3: Avg Confidence -->
-                    <com.google.android.material.card.MaterialCardView
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="4dp"
-                        android:layout_weight="1"
-                        app:cardBackgroundColor="#F0FDF4"
-                        app:cardCornerRadius="12dp"
-                        app:strokeColor="#BBF7D0"
-                        app:strokeWidth="1dp">
-
-                        <LinearLayout
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:gravity="center"
-                            android:orientation="vertical"
-                            android:padding="10dp">
-
-                            <TextView
-                                android:id="@+id/tvKpiConf"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="0%"
-                                android:textColor="#166534"
-                                android:textSize="20sp"
-                                android:textStyle="bold" />
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="Avg Conf"
-                                android:textColor="#4B5563"
-                                android:textSize="10sp" />
-                        </LinearLayout>
-                    </com.google.android.material.card.MaterialCardView>
-
-                </LinearLayout>
-
-                <!-- ═══════════════════════════════════════════════════ -->
-                <!-- Step 2: Freshness Analysis Card                     -->
-                <!-- ═══════════════════════════════════════════════════ -->
-                <com.google.android.material.card.MaterialCardView
-                    android:id="@+id/cardFreshness"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="14dp"
-                    android:layout_marginBottom="28dp"
-                    android:visibility="gone"
-                    app:cardBackgroundColor="#FFFFFF"
-                    app:cardCornerRadius="16dp"
-                    app:cardElevation="2dp"
-                    app:strokeColor="#BBF7D0"
-                    app:strokeWidth="1.5dp">
 
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
+                        android:gravity="center"
                         android:orientation="vertical"
-                        android:padding="16dp">
+                        android:padding="8dp">
 
-                        <!-- Card Header -->
-                        <LinearLayout
-                            android:layout_width="match_parent"
+                        <TextView
+                            android:id="@+id/tvKpiClasses"
+                            android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:orientation="horizontal"
-                            android:gravity="center_vertical"
-                            android:layout_marginBottom="12dp">
+                            android:text="0"
+                            android:textColor="#1E40AF"
+                            android:textSize="18sp"
+                            android:textStyle="bold" />
 
-                            <TextView
-                                android:layout_width="0dp"
-                                android:layout_height="wrap_content"
-                                android:layout_weight="1"
-                                android:text="🍃 Freshness Analysis"
-                                android:textColor="#0F172A"
-                                android:textSize="15sp"
-                                android:textStyle="bold" />
-
-                            <TextView
-                                android:id="@+id/tvFreshnessModelMode"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:background="@drawable/badge_step_bg"
-                                android:paddingStart="8dp"
-                                android:paddingTop="3dp"
-                                android:paddingEnd="8dp"
-                                android:paddingBottom="3dp"
-                                android:text="🎨 Heuristic"
-                                android:textColor="#166534"
-                                android:textSize="10sp"
-                                android:textStyle="bold" />
-
-                        </LinearLayout>
-
-                        <!-- Per-item freshness rows (populated by code) -->
-                        <LinearLayout
-                            android:id="@+id/freshnessItemsContainer"
-                            android:layout_width="match_parent"
+                        <TextView
+                            android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:orientation="vertical" />
+                            android:text="Classes"
+                            android:textColor="#1D4ED8"
+                            android:textSize="10sp"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+
+                <!-- Tile 3: Avg Confidence -->
+                <com.google.android.material.card.MaterialCardView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="3dp"
+                    android:layout_weight="1"
+                    app:cardBackgroundColor="#FFFBEB"
+                    app:cardCornerRadius="10dp"
+                    app:strokeColor="#FDE68A"
+                    app:strokeWidth="1dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center"
+                        android:orientation="vertical"
+                        android:padding="8dp">
+
+                        <TextView
+                            android:id="@+id/tvKpiConf"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="0%"
+                            android:textColor="#B45309"
+                            android:textSize="18sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Confidence"
+                            android:textColor="#B45309"
+                            android:textSize="10sp"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+
+            </LinearLayout>
+
+            <!-- Freshness & Plant Growth Analysis Card -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/cardFreshness"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:layout_marginBottom="12dp"
+                android:visibility="gone"
+                app:cardBackgroundColor="#FFFFFF"
+                app:cardCornerRadius="14dp"
+                app:cardElevation="1dp"
+                app:strokeColor="#CBD5E1"
+                app:strokeWidth="1dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="12dp">
+
+                    <!-- Card Header -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
+                        android:layout_marginBottom="8dp">
+
+                        <TextView
+                            android:id="@+id/tvAnalysisCardTitle"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="🍃 Analysis &amp; Insights"
+                            android:textColor="#0F172A"
+                            android:textSize="14sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:id="@+id/tvFreshnessModelMode"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:background="@drawable/badge_step_bg"
+                            android:paddingStart="8dp"
+                            android:paddingTop="2dp"
+                            android:paddingEnd="8dp"
+                            android:paddingBottom="2dp"
+                            android:text="🎨 Heuristic"
+                            android:textColor="#166534"
+                            android:textSize="9.5sp"
+                            android:textStyle="bold" />
+
+                    </LinearLayout>
+
+                    <!-- Per-item freshness / plant growth rows -->
+                    <LinearLayout
+                        android:id="@+id/freshnessItemsContainer"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical" />
+
+                    <!-- Overall status summary for produce freshness -->
+                    <LinearLayout
+                        android:id="@+id/layoutOverallFreshnessSummary"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical">
 
                         <!-- Divider -->
                         <View
                             android:layout_width="match_parent"
                             android:layout_height="1dp"
-                            android:layout_marginTop="12dp"
-                            android:layout_marginBottom="10dp"
+                            android:layout_marginTop="8dp"
+                            android:layout_marginBottom="6dp"
                             android:background="#E2E8F0" />
 
-                        <!-- Overall freshness score summary -->
+                        <!-- Overall status summary -->
                         <LinearLayout
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
@@ -496,12 +665,13 @@
                             android:gravity="center_vertical">
 
                             <TextView
+                                android:id="@+id/tvOverallRatingLabel"
                                 android:layout_width="0dp"
                                 android:layout_height="wrap_content"
                                 android:layout_weight="1"
-                                android:text="Overall Freshness"
+                                android:text="Overall Status"
                                 android:textColor="#475569"
-                                android:textSize="12sp"
+                                android:textSize="11.5sp"
                                 android:textStyle="bold" />
 
                             <TextView
@@ -510,18 +680,18 @@
                                 android:layout_height="wrap_content"
                                 android:text="–"
                                 android:textColor="#15803D"
-                                android:textSize="13sp"
+                                android:textSize="12.5sp"
                                 android:textStyle="bold" />
 
                         </LinearLayout>
 
-                        <!-- Overall freshness score bar -->
+                        <!-- Overall progress bar -->
                         <ProgressBar
                             android:id="@+id/progressFreshnessOverall"
                             style="?android:attr/progressBarStyleHorizontal"
                             android:layout_width="match_parent"
-                            android:layout_height="10dp"
-                            android:layout_marginTop="6dp"
+                            android:layout_height="7dp"
+                            android:layout_marginTop="5dp"
                             android:max="100"
                             android:progress="70"
                             android:progressTint="#22C55E"
@@ -529,105 +699,12 @@
 
                     </LinearLayout>
 
-                </com.google.android.material.card.MaterialCardView>
+                </LinearLayout>
 
-            </LinearLayout>
-
-        </ScrollView>
-
-        <!-- 2. Web Dashboard View -->
-        <LinearLayout
-            android:id="@+id/webViewContainer"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:orientation="vertical"
-            android:visibility="gone">
-
-            <!-- Server URL Bar -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="48dp"
-                android:background="#F1F5F9"
-                android:gravity="center_vertical"
-                android:orientation="horizontal"
-                android:paddingStart="12dp"
-                android:paddingEnd="12dp">
-
-                <TextView
-                    android:id="@+id/tvServerStatus"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:ellipsize="middle"
-                    android:singleLine="true"
-                    android:text="http://10.0.2.2:8501"
-                    android:textColor="#334155"
-                    android:textSize="12sp" />
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnReloadWeb"
-                    style="@style/Widget.MaterialComponents.Button.TextButton"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="🔄 Reload"
-                    android:textColor="#15803D" />
-
-            </LinearLayout>
-
-            <WebView
-                android:id="@+id/webView"
-                android:layout_width="match_parent"
-                android:layout_height="0dp"
-                android:layout_weight="1" />
-
-            <LinearLayout
-                android:id="@+id/errorView"
-                android:layout_width="match_parent"
-                android:layout_height="0dp"
-                android:layout_weight="1"
-                android:gravity="center"
-                android:orientation="vertical"
-                android:padding="24dp"
-                android:visibility="gone">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="🌿"
-                    android:textSize="48sp" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
-                    android:text="FreshAI Web Dashboard"
-                    android:textColor="#15803D"
-                    android:textSize="18sp"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:id="@+id/tvErrorDetails"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="6dp"
-                    android:gravity="center"
-                    android:text="If running on a physical phone, set your PC WiFi IP address in settings (e.g. http://192.168.x.x:8501)."
-                    android:textColor="#64748B"
-                    android:textSize="13sp" />
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnRetryWeb"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="16dp"
-                    android:backgroundTint="#15803D"
-                    android:text="Retry Connection"
-                    android:textColor="#FFFFFF" />
-
-            </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
 
         </LinearLayout>
 
-    </FrameLayout>
+    </ScrollView>
 
 </LinearLayout>

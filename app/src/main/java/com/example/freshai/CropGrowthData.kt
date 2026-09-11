@@ -30,6 +30,10 @@ data class CropCultivationProfile(
     val waterNeeds: String,
     val harvestSigns: String,
     val careTips: String,
+    val npkRatio: String = "NPK 10-10-10 (Vegetative) / 5-10-15 (Fruiting)",
+    val optimalPickingWindow: String = "Early Morning (6:00 AM – 9:30 AM)",
+    val diseaseWatch: String = "Early blight, powdery mildew, aphids & whiteflies",
+    val gddTarget: String = "1,150–1,400 GDD (Growing Degree Days)"
 )
 
 /**
@@ -51,8 +55,8 @@ object CropGrowthRepository {
                 CropStage(1, "Germination & Sprouting", "6–10 days", "Seed absorbs moisture, radicle sprouts, first cotyledons emerge.", 15, "🌱"),
                 CropStage(2, "Vegetative & Foliage Growth", "20–25 days", "Rapid stem elongation, branching, and lush canopy establishment.", 35, "🌿"),
                 CropStage(3, "Flowering & Pollination", "15–20 days", "Bright yellow flower clusters form; self-pollination aided by gentle breeze or bees.", 55, "🌼"),
-                CropStage(4, "Fruit Formation & Sizing", "20–30 days", "Petals drop, tiny green ovaries swell into full-sized firm green tomatoes.", 80, "🟢"),
-                CropStage(5, "Ripening & Breaker Stage", "10–15 days", "Lycopene synthesis triggers color shift from yellow/orange to deep vibrant red.", 100, "🍅"),
+                CropStage(4, "Fruit Formation & Ripening", "10–15 days", "Green fruit swells and enters breaker turning phase (~10–15 days to harvest).", 80, "🟢"),
+                CropStage(5, "Harvest Ready", "Peak Ripe", "Deep vibrant red, slight give to gentle touch, ready for harvest now.", 100, "🍅"),
             ),
             sunlight = "Full Sun (6–8+ hours direct sunlight daily)",
             temperature = "21°C–29°C (70°F–85°F) optimal day; 16°C–20°C night",
@@ -360,6 +364,52 @@ object CropGrowthRepository {
             harvestSigns = "Firm, bright green, 6–8 inches long (slicing) or 2–4 inches (pickling); pick before yellowing.",
             careTips = "Grow on a vertical trellis to improve airflow, prevent powdery mildew, and yield straight, clean fruit.",
         ),
+
+        CropCultivationProfile(
+            name = "Garlic",
+            scientificName = "Allium sativum",
+            category = "Vegetable",
+            emoji = "🧄",
+            totalDurationRange = "180–240 days (clove)",
+            averageDays = 210,
+            difficulty = "Easy",
+            stages = listOf(
+                CropStage(1, "Rooting & Clove Sprout", "10–20 days", "Fibrous root anchor spreads downward; emerald green sprout shoots up.", 15, "🌱"),
+                CropStage(2, "Vegetative Canopy & Leafing", "60–90 days", "Sturdy upright strap-like leaves emerge to capture spring sunshine.", 40, "🌿"),
+                CropStage(3, "Scape Curling & Node Extension", "30–45 days", "Curling flower scape stem spirals (snip off to enlarge bulbs).", 65, "🪱"),
+                CropStage(4, "Bulb Swelling & Clove Division", "30–45 days", "Underground bulb expands and divides into distinct plump cloves.", 85, "🧄"),
+                CropStage(5, "Lower Foliage Curing & Harvest", "15–20 days", "Bottom 3–4 leaves brown while top leaves stay green; ready to lift.", 100, "🧺"),
+            ),
+            sunlight = "Full Sun (6–8 hours/day)",
+            temperature = "13°C–24°C (55°F–75°F); requires cold vernalization period to split into cloves",
+            soilAndPh = "Loose, fertile, rock-free sandy loam rich in organic matter; pH 6.0–7.0",
+            waterNeeds = "1 inch per week; cease watering 2–3 weeks before harvest to cure papery wrappers",
+            harvestSigns = "Bottom half of foliage turns golden brown and papery; outer clove wrappers feel distinct and tight.",
+            careTips = "Plant individual unpeeled cloves pointy end up 2 inches deep in autumn; mulch heavily.",
+        ),
+
+        CropCultivationProfile(
+            name = "Ginger",
+            scientificName = "Zingiber officinale",
+            category = "Vegetable",
+            emoji = "🫚",
+            totalDurationRange = "240–300 days (rhizome)",
+            averageDays = 260,
+            difficulty = "Moderate",
+            stages = listOf(
+                CropStage(1, "Rhizome Eye Sprout", "15–30 days", "Green growth buds on rhizome break dormancy and push through soil.", 15, "🌱"),
+                CropStage(2, "Reed-like Foliage Canopy", "60–90 days", "Graceful reed-like leafy stalks grow upward (up to 3–4 feet high).", 40, "🌿"),
+                CropStage(3, "Subterranean Tillering & Branching", "60–90 days", "New subterranean rhizome fingers branch outwards continuously.", 65, "🫚"),
+                CropStage(4, "Rhizome Bulking & Oil Maturation", "45–60 days", "Pungent gingerols and aromatic oils deposit into dense rhizome fingers.", 85, "🫚"),
+                CropStage(5, "Leaf Yellowing & Peak Harvest", "15–30 days", "Foliage dies back naturally in cool weather; rhizomes reach peak harvest.", 100, "🧺"),
+            ),
+            sunlight = "Filtered / Partial Sunlight (2–5 hours; loves warm dappled shade)",
+            temperature = "22°C–30°C (72°F–86°F); very sensitive to frost and dry heat",
+            soilAndPh = "Rich, moist, loose loamy soil amended with plenty of compost; pH 5.5–6.5",
+            waterNeeds = "Consistent moisture; never allow soil to dry out completely, but ensure sharp drainage",
+            harvestSigns = "Foliage turns yellow and withers back; rhizomes develop thick tan skin and strong aroma.",
+            careTips = "Plant plump rhizome segments with growth eyes pointing upward 1–2 inches deep in warm soil.",
+        ),
     )
 
     /**
@@ -371,6 +421,19 @@ object CropGrowthRepository {
             crop.name.lowercase() == clean ||
                     clean.contains(crop.name.lowercase()) ||
                     crop.name.lowercase().contains(clean) ||
+                    (clean.contains("lehsun") && crop.name == "Garlic") ||
+                    (clean.contains("garlic") && crop.name == "Garlic") ||
+                    (clean.contains("adrak") && crop.name == "Ginger") ||
+                    (clean.contains("ginger") && crop.name == "Ginger") ||
+                    (clean.contains("aloo") && crop.name == "Potato") ||
+                    (clean.contains("potato") && crop.name == "Potato") ||
+                    (clean.contains("pyaz") && crop.name == "Onion") ||
+                    (clean.contains("tamatar") && crop.name == "Tomato") ||
+                    (clean.contains("kheera") && crop.name == "Cucumber") ||
+                    (clean.contains("gajar") && crop.name == "Carrot") ||
+                    (clean.contains("kela") && crop.name == "Banana") ||
+                    (clean.contains("seb") && crop.name == "Apple") ||
+                    (clean.contains("nimbu") && crop.name == "Lemon") ||
                     (clean.contains("brinjal") && crop.name == "Eggplant") ||
                     (clean.contains("capsicum") && crop.name == "Bell Pepper") ||
                     (clean.contains("pepper") && crop.name == "Bell Pepper") ||

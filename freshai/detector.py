@@ -190,44 +190,87 @@ def suppress_overlapping_produce_boxes(
 def disambiguate_produce_class(crop_pil: Image.Image, candidate_name: str) -> str:
     """
     Guards against produce misclassifications.
-    Specifically addresses cases where an Onion is mistakenly classified as Watermelon,
-    Tomato, Potato, or Apple due to shared round/spherical morphology or skin striations.
+    Specifically addresses cases where an Onion, Potato, Lemon, Orange, or Banana is mistakenly
+    classified as Tomato or Watermelon due to shared round/spherical morphology or lighting.
     """
     c_lower = candidate_name.lower().strip()
     try:
         arr = np.array(crop_pil.convert("RGB"))
         if arr.size > 0:
+            h, w = arr.shape[:2]
+            is_elongated = (w / max(1, h) > 2.0) or (h / max(1, w) > 2.0)
             hsv = cv2.cvtColor(arr, cv2.COLOR_RGB2HSV)
-            h, s, v = hsv[:, :, 0], hsv[:, :, 1], hsv[:, :, 2]
+            hue, sat, val = hsv[:, :, 0], hsv[:, :, 1], hsv[:, :, 2]
 
-            # Onion distinct color profiles:
-            # 1. Red onion magenta / violet anthocyanin layers (h 135-170)
-            magenta_mask = (h >= 135) & (h <= 170) & (s >= 25) & (v >= 30)
+            # 1. Garlic (Lehsun): Papery pearl-white / ivory cloves (warm tint)
+            garlic_mask = (sat >= 8) & (sat <= 45) & (val >= 165) & (arr[:, :, 0] >= arr[:, :, 1]) & (arr[:, :, 1] >= arr[:, :, 2])
+            garlic_pct = float(np.mean(garlic_mask))
+
+            # 2. Earthy low saturation tan/gray (Potato)
+            potato_mask = (sat <= 60) & (val >= 60) & (val <= 200)
+            potato_pct = float(np.mean(potato_mask))
+
+            # 3. Ginger (Adrak): Warm buff/tan fibrous rhizome
+            ginger_mask = (hue >= 12) & (hue <= 24) & (sat >= 50) & (sat <= 145) & (val >= 100) & (val <= 210)
+            ginger_pct = float(np.mean(ginger_mask))
+
+            # 4. Tomato (Tamatar): Crimson Red / Breaker Orange-Red / Turning Pink
+            tomato_red = (((hue <= 14) | (hue >= 168)) & (sat >= 50) & (val >= 50)) | ((hue >= 8) & (hue <= 28) & (sat >= 60) & (val >= 70))
+            tomato_red_pct = float(np.mean(tomato_red))
+
+            # 5. Red onion magenta / violet anthocyanin layers (hue 135-175 in OpenCV 0-180 scale)
+            magenta_mask = (hue >= 135) & (hue <= 175) & (sat >= 35) & (val >= 40)
             magenta_pct = float(np.mean(magenta_mask))
 
-            # 2. Yellow/brown onion dry papery tunic (h 10-30, s 20-180, v 35-230)
-            tan_mask = (h >= 10) & (h <= 30) & (s >= 20) & (v >= 35)
+            # 6. Yellow/brown onion dry papery tunic (hue 14-24 in OpenCV scale, sat 50-160, val 80-200)
+            tan_mask = (hue >= 14) & (hue <= 24) & (sat >= 50) & (sat <= 160) & (val >= 80) & (val <= 200)
             tan_pct = float(np.mean(tan_mask))
 
-            # Watermelon check
-            if c_lower in ["watermelon", "melon"]:
-                green_mask = (h >= 35) & (h <= 85) & (s >= 30) & (v >= 20)
-                green_pct = float(np.mean(green_mask))
-                if green_pct < 0.004 and (magenta_pct >= 0.008 or tan_pct >= 0.05):
-                    return "onion"
+            # 7. Carrot Orange (hue 8-18, sat >= 150)
+            carrot_mask = (hue >= 8) & (hue <= 18) & (sat >= 150) & (val >= 110)
+            carrot_pct = float(np.mean(carrot_mask))
 
-            # Tomato check: True ripe tomatoes have saturated crimson/red pulp (h <= 8 or h >= 172 with s >= 80)
-            elif c_lower in ["tomato"]:
-                tomato_red = ((h <= 8) | (h >= 172)) & (s >= 80) & (v >= 50)
-                tomato_red_pct = float(np.mean(tomato_red))
-                # If it lacks strong tomato red AND has dominant onion tan/magenta, it is an Onion!
-                if tomato_red_pct < 0.14 and (tan_pct >= 0.16 or magenta_pct >= 0.012):
-                    return "onion"
+            # 8. Vivid Orange fruit
+            orange_mask = (hue >= 7) & (hue <= 18) & (sat >= 140) & (val >= 100)
+            orange_pct = float(np.mean(orange_mask))
 
-            # Apple / Potato check:
-            elif c_lower in ["apple", "potato"]:
-                if magenta_pct >= 0.012 or (tan_pct >= 0.18 and c_lower == "apple"):
-                    return "onion"
+            # 9. Yellow (Banana / Lemon: hue 22-33, sat >= 70)
+            yellow_mask = (hue >= 22) & (hue <= 33) & (sat >= 70) & (val >= 100)
+            yellow_pct = float(np.mean(yellow_mask))
+
+            # 10. Green Produce (Cucumber / Green Tomato / Watermelon)
+            green_mask = (hue >= 33) & (hue <= 85) & (sat >= 40) & (val >= 35)
+            green_pct = float(np.mean(green_mask))
+
+            # 11. Eggplant deep purple
+            eggplant_mask = (hue >= 125) & (hue <= 165) & (val >= 25) & (val <= 110)
+            eggplant_pct = float(np.mean(eggplant_mask))
+
+            # Disambiguation rules:
+            # 1. Tomato priority (Crimson red, breaker orange/yellow blush)
+            if tomato_red_pct > 0.04 or (tomato_red_pct >= magenta_pct and tomato_red_pct > 0.02):
+                return "apple" if c_lower == "apple" else "tomato"
+
+            # 2. Red Onion priority: Only if true magenta anthocyanin is present
+            if magenta_pct > 0.08:
+                return "onion"
+
+            # 3. Yellow Onion papery husk: Only if golden tan husk present without tomato tones
+            if tan_pct > 0.18 and tomato_red_pct < 0.02:
+                return "onion"
+
+            if c_lower in ["onion", "pyaz"] and tomato_red_pct < 0.03:
+                return "onion"
+            if ginger_pct > 0.18 and potato_pct < 0.15:
+                return "ginger"
+            if potato_pct > 0.25 and tan_pct < 0.08 and tomato_red_pct < 0.08:
+                return "potato"
+            if orange_pct > 0.18:
+                return "carrot" if is_elongated else "orange"
+            if yellow_pct > 0.18:
+                return "banana" if is_elongated else "lemon"
+            if green_pct > 0.22:
+                return "watermelon" if c_lower == "watermelon" else "bell pepper" if c_lower == "bell pepper" else "tomato"
     except Exception:
         pass
 
@@ -472,20 +515,20 @@ class FreshAIDetector:
                             hc, sc, vc = hsv_c[:, :, 0], hsv_c[:, :, 1], hsv_c[:, :, 2]
                             tan_c = float(np.mean((hc >= 10) & (hc <= 32) & (sc >= 18) & (vc >= 30)))
                             mag_c = float(np.mean((hc >= 135) & (hc <= 170) & (sc >= 20) & (vc >= 25)))
-                            if c_name == "onion" or tan_c >= 0.04 or mag_c >= 0.008:
+                            if c_name in ["onion", "tomato", "apple", "potato", "orange", "lemon", "carrot", "cucumber", "banana"]:
                                 norm_xc = (bx1 + bx2) / (2.0 * img_w)
                                 norm_yc = (by1 + by2) / (2.0 * img_h)
                                 rec_obj = DetectedObject(
                                     class_id=c_id,
-                                    class_name="Onion",
-                                    confidence=max(c_conf + 0.60, 0.75),
+                                    class_name=c_name.capitalize(),
+                                    confidence=max(c_conf + 0.50, 0.80),
                                     bbox_xyxy=[bx1, by1, bx2, by2],
                                     bbox_norm_xywh=[norm_xc, norm_yc, bw_px / img_w, bh_px / img_h],
                                     width_px=bw_px,
                                     height_px=bh_px,
                                 )
                                 detected_objects.append(rec_obj)
-                                break  # Recovered primary onion
+                                break
             except Exception:
                 pass
 

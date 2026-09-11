@@ -1,12 +1,16 @@
-Tomato
 Onion
+Tomato
+Watermelon
 Apple
 Banana
 Orange
 Potato
 Bell Pepper
-Watermelon
 Strawberry
 Lemon
 Mango
 Eggplant
+Garlic
+Ginger
+Cucumber
+Carrot

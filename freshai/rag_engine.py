@@ -28,9 +28,8 @@ PRODUCE_KNOWLEDGE_BASE: Dict[str, Dict[str, Any]] = {
         "ethylene_sensitivity": "High",
         "optimal_storage_temp": "4°C – 8°C (Refrigerator crisper) / 15°C – 20°C (Countertop)",
         "optimal_humidity": "85% – 90% RH",
-        "storage_location": "Refrigerator Crisper Drawer (or Countertop if ripening)",
-        "refrigeration_advice": "Store ripe tomatoes in refrigerator crisper to extend shelf life up to 10-14 days. Bring to room temperature before eating for best flavor.",
-        "chilling_injury_temp": "None for ripe tomatoes (refrigeration preserves firmness and prevents spoilage)",
+        "refrigeration_advice": "Never refrigerate unripe tomatoes (< 10°C causes chilling injury). Store fully ripe tomatoes at room temperature or refrigerator crisper to extend shelf life. Bring to room temperature before eating for best flavor.",
+        "chilling_injury_temp": "< 10°C (temperatures below 10°C induce chilling injury)",
         "ethylene_co_location": "Keep isolated from ethylene-sensitive greens like cucumbers, broccoli, and leafy greens. Can be paired with unripe avocados to naturally hasten their ripening.",
         "handling_and_preservation": [
             "Store stem-side down to prevent moisture transpirational loss through the stem scar and block microbial entry.",
@@ -268,6 +267,130 @@ PRODUCE_KNOWLEDGE_BASE: Dict[str, Dict[str, Any]] = {
                 "prep_time": "30 mins",
                 "difficulty": "Easy",
                 "instructions": "Simmer softened onions with balsamic vinegar, rosemary, and brown sugar until glossy and jammy for cheese boards."
+            }
+        }
+    },
+    "garlic": {
+        "scientific_name": "Allium sativum",
+        "climacteric": False,
+        "ethylene_production": "Extremely Low (< 0.05 µL/kg·h)",
+        "ethylene_sensitivity": "Very Low",
+        "optimal_storage_temp": "15°C – 18°C (Cool, dry, dark pantry in a breathable mesh sack)",
+        "optimal_humidity": "60% – 70% RH",
+        "storage_location": "Dark Ventilated Pantry (Never sealed plastic or refrigerator)",
+        "refrigeration_advice": "Never store whole uncut garlic in the refrigerator. Cold temperatures (sub-10°C) combined with moisture trigger premature sprouting and promote Penicillium blue-green mold rot.",
+        "chilling_injury_temp": "Cold humid conditions trigger sprouting and mold decay.",
+        "ethylene_co_location": "Store in a well-ventilated dry basket away from damp produce and onions.",
+        "handling_and_preservation": [
+            "Keep whole unpeeled bulbs intact until ready to cook; peeling exposes cloves to rapid desiccation.",
+            "Store in a breathable wire or mesh container with active air circulation in complete darkness.",
+            "If green sprouts emerge, slice cloves in half and remove the bitter green germ before cooking; remaining clove is safe to consume."
+        ],
+        "nutrition": {
+            "serving_size": "100g (approx. 33 cloves)",
+            "calories_kcal": 149,
+            "carbohydrates_g": 33.1,
+            "dietary_fiber_g": 2.1,
+            "protein_g": 6.4,
+            "fat_g": 0.5,
+            "vitamins": {
+                "Vitamin C": "31.2 mg (35% DV)",
+                "Vitamin B6": "1.23 mg (73% DV)",
+                "Thiamin (B1)": "0.2 mg (17% DV)"
+            },
+            "minerals": {
+                "Manganese": "1.67 mg (73% DV)",
+                "Selenium": "14.2 mcg (26% DV)",
+                "Calcium": "181 mg (14% DV)"
+            },
+            "antioxidants": "Extremely rich in Allicin (activated upon crushing/chopping), Alliin, Diallyl disulfide, and Ajoene.",
+            "health_facts": [
+                "Cardiovascular Protection: Allicin and polysulfides produce hydrogen sulfide (H2S) in vascular tissue, promoting vasodilation and arterial elasticity (Harvard Health).",
+                "Potent Antimicrobial: Bioactive allicin exhibits broad-spectrum antibacterial and antifungal activity (WHO).",
+                "Immune Support: Regular dietary garlic intake reduces common cold incidence and accelerates symptom clearance."
+            ],
+            "trusted_sources": ["USDA FoodData Central (FDC ID: 169230)", "National Institutes of Health (NIH)", "WHO Monographs on Medicinal Plants"]
+        },
+        "recipes": {
+            "fresh_grade_a": {
+                "title": "Spanish Garlic Gambas & Herb Olive Oil",
+                "prep_time": "10 mins",
+                "difficulty": "Easy",
+                "instructions": "Thinly slice fresh firm garlic cloves. Sizzle in extra virgin olive oil with chili flakes and fresh parsley."
+            },
+            "ripe_grade_b": {
+                "title": "Whole-Head Slow Roasted Confit",
+                "prep_time": "45 mins",
+                "difficulty": "Easy",
+                "instructions": "Slice top off whole garlic bulbs, douse with olive oil, wrap in foil and roast at 190°C for 45 mins until sweet and spreadable."
+            },
+            "salvage_grade_c": {
+                "title": "Aromatic Garlic Infused Finishing Oil",
+                "prep_time": "20 mins",
+                "difficulty": "Easy",
+                "instructions": "Simmer peeled softened garlic cloves gently in olive oil on low heat for 15 mins. Strain and store refrigerated."
+            }
+        }
+    },
+    "ginger": {
+        "scientific_name": "Zingiber officinale",
+        "climacteric": False,
+        "ethylene_production": "Very Low (< 0.1 µL/kg·h)",
+        "ethylene_sensitivity": "Low",
+        "optimal_storage_temp": "12°C – 14°C (Pantry) or 4°C – 7°C (Crisper drawer in airtight pouch)",
+        "optimal_humidity": "75% – 85% RH",
+        "storage_location": "Pantry for short term (2 weeks) / Refrigerator crisper in airtight pouch (up to 2 months)",
+        "refrigeration_advice": "Store unpeeled in a resealable airtight silicone bag with air pressed out in the crisper drawer to prevent fibrous wrinkling and mold.",
+        "chilling_injury_temp": "< 10°C without protection causes surface pitting; protect in airtight packaging.",
+        "ethylene_co_location": "Safe around most vegetables; keep away from excessive moisture.",
+        "handling_and_preservation": [
+            "Never peel ginger before storage; the thin outer skin preserves internal gingerols and essential oils.",
+            "Can be frozen whole and grated directly into hot stir-fries, curries, and teas without thawing.",
+            "If slight surface dryness occurs, shave off the dry tip; the dense internal rhizome remains highly potent."
+        ],
+        "nutrition": {
+            "serving_size": "100g",
+            "calories_kcal": 80,
+            "carbohydrates_g": 17.8,
+            "dietary_fiber_g": 2.0,
+            "protein_g": 1.8,
+            "fat_g": 0.8,
+            "vitamins": {
+                "Vitamin C": "5.0 mg (6% DV)",
+                "Vitamin B6": "0.16 mg (9% DV)",
+                "Niacin (B3)": "0.75 mg"
+            },
+            "minerals": {
+                "Potassium": "415 mg (9% DV)",
+                "Magnesium": "43 mg (10% DV)",
+                "Copper": "0.23 mg (25% DV)"
+            },
+            "antioxidants": "Abundant in 6-Gingerol, 6-Shogaol (formed upon cooking/drying), Zingerone, and Paradols.",
+            "health_facts": [
+                "Anti-Inflammatory & Analgesic: Gingerols inhibit COX-2 and inflammatory cytokines, reducing joint stiffness and delayed onset muscle soreness (Harvard Health).",
+                "Gastrointestinal & Anti-Nausea: Accelerates gastric emptying and relieves morning sickness and motion-induced nausea (NIH/WHO).",
+                "Metabolic & Lipid Support: Regular dietary ginger helps lower fasting blood glucose and HbA1c in metabolic studies."
+            ],
+            "trusted_sources": ["USDA FoodData Central (FDC ID: 169231)", "Harvard T.H. Chan School of Public Health", "NIH National Center for Complementary Health"]
+        },
+        "recipes": {
+            "fresh_grade_a": {
+                "title": "Fresh Honey-Ginger Immunity Elixir",
+                "prep_time": "10 mins",
+                "difficulty": "Easy",
+                "instructions": "Thinly slice fresh spicy ginger. Steep in boiling water with raw honey, fresh lemon juice, and crushed black pepper."
+            },
+            "ripe_grade_b": {
+                "title": "Aromatic Ginger-Garlic Curry Base",
+                "prep_time": "15 mins",
+                "difficulty": "Easy",
+                "instructions": "Grate equal parts ginger and garlic into a fine paste. Saute in ghee or oil until fragrant as a foundational savory base."
+            },
+            "salvage_grade_c": {
+                "title": "Zero-Waste Ginger Peel Broth Booster",
+                "prep_time": "30 mins",
+                "difficulty": "Easy",
+                "instructions": "Simmer washed ginger peels and rhizome tips with lemongrass, garlic, and vegetable scraps for a warming restorative broth."
             }
         }
     },

@@ -40,6 +40,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.chip.Chip
+import com.google.android.material.chip.ChipGroup
 import com.google.android.material.tabs.TabLayout
 import org.json.JSONArray
 import org.json.JSONObject
@@ -55,7 +56,6 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var tabLayout: TabLayout
     private lateinit var studioView: ScrollView
-    private lateinit var webViewContainer: LinearLayout
     private lateinit var progressBar: ProgressBar
 
     // Detection Studio elements
@@ -63,8 +63,17 @@ class MainActivity : AppCompatActivity() {
     private lateinit var boxOverlay: BoundingBoxOverlayView
 
     private lateinit var placeholderLayout: LinearLayout
+    private lateinit var tvPlaceholderEmoji: TextView
+    private lateinit var tvPlaceholderTitle: TextView
+    private lateinit var tvPlaceholderSub: TextView
     private lateinit var btnCamera: MaterialButton
     private lateinit var btnGallery: MaterialButton
+
+    // Quick Crop Selector
+    private lateinit var layoutCropSelector: LinearLayout
+    private lateinit var chipGroupCrops: ChipGroup
+    private var selectedCropName: String? = null
+    private var isSyncingCropChips = false
 
     // Studio Analytics KPI elements
     private lateinit var kpiRow: LinearLayout
@@ -75,33 +84,40 @@ class MainActivity : AppCompatActivity() {
     // Freshness & ML Intelligence elements
     private lateinit var cardFreshness: com.google.android.material.card.MaterialCardView
     private lateinit var freshnessItemsContainer: LinearLayout
+    private lateinit var layoutOverallFreshnessSummary: LinearLayout
     private lateinit var tvFreshnessModelMode: TextView
+    private lateinit var tvAnalysisCardTitle: TextView
+    private lateinit var tvOverallRatingLabel: TextView
     private lateinit var tvOverallFreshness: TextView
     private lateinit var progressFreshnessOverall: android.widget.ProgressBar
 
     // Scan Mode UI
     private lateinit var tvStudioBadge: TextView
-    private lateinit var cardScanModeSelector: com.google.android.material.card.MaterialCardView
-    private lateinit var rgScanMode: RadioGroup
-    private lateinit var rbModeProduce: RadioButton
-    private lateinit var rbModeCropPlant: RadioButton
     private lateinit var tvScanModeHint: TextView
     private var isCropGrowthMode = false
     private var lastAnalyzedBitmap: Bitmap? = null
     private var lastDetectedItems = listOf<DetectedItem>()
     private var lastEstimates = listOf<FreshnessEstimate>()
 
-    // Web Dashboard elements
-    private lateinit var webView: WebView
-    private lateinit var errorView: LinearLayout
-    private lateinit var tvServerStatus: TextView
-    private lateinit var btnReloadWeb: MaterialButton
-    private lateinit var btnRetryWeb: MaterialButton
+    private lateinit var btnCropLibrary: MaterialButton
+    private lateinit var btnPlantDoctor: MaterialButton
+    private lateinit var btnHarvestTimeline: MaterialButton
+    private lateinit var btnExportReport: MaterialButton
+
     private lateinit var btnConfigIp: MaterialButton
 
-    private var fileChooserCallback: ValueCallback<Array<Uri>>? = null
+    // Real-Time Hardware Sensor Integration (Light & Accelerometer)
+    private lateinit var layoutSensorHud: LinearLayout
+    private lateinit var tvSensorLux: TextView
+    private lateinit var tvSensorTemp: TextView
+    private lateinit var tvSensorStability: TextView
+    private var sensorManager: android.hardware.SensorManager? = null
+    private var lightSensor: android.hardware.Sensor? = null
+    private var accelSensor: android.hardware.Sensor? = null
+    private var currentLuxValue: Float = 480f
+    private var isDeviceStable: Boolean = true
+
     private var baseHost = "127.0.0.1"
-    private var webUrl = "http://127.0.0.1:8501"
     private var apiUrl = "http://127.0.0.1:8088/api/detect"
     private var photoFileUri: Uri? = null
 
@@ -160,99 +176,178 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    // WebView File Chooser
-    private val filePickerLauncher = registerForActivityResult(
-        ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        if (result.resultCode == Activity.RESULT_OK) {
-            val intent = result.data
-            val results = WebChromeClient.FileChooserParams.parseResult(result.resultCode, intent)
-            fileChooserCallback?.onReceiveValue(results)
-        } else {
-            fileChooserCallback?.onReceiveValue(null)
-        }
-        fileChooserCallback = null
-    }
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Seamless green status bar matching top navbar
+        window.statusBarColor = ContextCompat.getColor(this, R.color.fresh_primary)
+        androidx.core.view.WindowCompat.getInsetsController(window, window.decorView)?.isAppearanceLightStatusBars = false
+
         setContentView(R.layout.activity_main)
 
         loadSavedUrls()
         bindViews()
+        initHardwareSensors()
         setupListeners()
-        setupWebView()
         onDeviceDetector = YoloOnnxDetector(this)
+    }
+
+    private fun initHardwareSensors() {
+        try {
+            sensorManager = getSystemService(Context.SENSOR_SERVICE) as? android.hardware.SensorManager
+            lightSensor = sensorManager?.getDefaultSensor(android.hardware.Sensor.TYPE_LIGHT)
+            accelSensor = sensorManager?.getDefaultSensor(android.hardware.Sensor.TYPE_ACCELEROMETER)
+        } catch (e: Exception) {
+            // Graceful fallback for devices/emulators without sensors
+        }
     }
 
     private fun loadSavedUrls() {
         val prefs = getSharedPreferences("freshai_prefs", Context.MODE_PRIVATE)
         baseHost = prefs.getString("server_host", "127.0.0.1") ?: "127.0.0.1"
-        webUrl = "http://$baseHost:8501"
         apiUrl = "http://$baseHost:8088/api/detect"
     }
 
     private fun saveHost(host: String) {
         baseHost = host
-        webUrl = "http://$baseHost:8501"
         apiUrl = "http://$baseHost:8088/api/detect"
         getSharedPreferences("freshai_prefs", Context.MODE_PRIVATE)
             .edit()
             .putString("server_host", baseHost)
             .apply()
-        tvServerStatus.text = webUrl
     }
 
     private fun bindViews() {
         tabLayout = findViewById(R.id.tabLayout)
         studioView = findViewById(R.id.studioView)
-        webViewContainer = findViewById(R.id.webViewContainer)
         progressBar = findViewById(R.id.progressBar)
 
         tvStudioBadge = findViewById(R.id.tvStudioBadge)
-        cardScanModeSelector = findViewById(R.id.cardScanModeSelector)
-        rgScanMode = findViewById(R.id.rgScanMode)
-        rbModeProduce = findViewById(R.id.rbModeProduce)
-        rbModeCropPlant = findViewById(R.id.rbModeCropPlant)
         tvScanModeHint = findViewById(R.id.tvScanModeHint)
 
         ivPreview = findViewById(R.id.ivPreview)
         boxOverlay = findViewById(R.id.boxOverlay)
         placeholderLayout = findViewById(R.id.placeholderLayout)
+        tvPlaceholderEmoji = findViewById(R.id.tvPlaceholderEmoji)
+        tvPlaceholderTitle = findViewById(R.id.tvPlaceholderTitle)
+        tvPlaceholderSub = findViewById(R.id.tvPlaceholderSub)
         btnCamera = findViewById(R.id.btnCamera)
         btnGallery = findViewById(R.id.btnGallery)
+        btnCropLibrary = findViewById(R.id.btnCropLibrary)
+        btnPlantDoctor = findViewById(R.id.btnPlantDoctor)
+        btnHarvestTimeline = findViewById(R.id.btnHarvestTimeline)
+        btnExportReport = findViewById(R.id.btnExportReport)
+
+        // Sensor HUD Views
+        layoutSensorHud = findViewById(R.id.layoutSensorHud)
+        tvSensorLux = findViewById(R.id.tvSensorLux)
+        tvSensorTemp = findViewById(R.id.tvSensorTemp)
+        tvSensorStability = findViewById(R.id.tvSensorStability)
+
+        layoutCropSelector = findViewById(R.id.layoutCropSelector)
+        chipGroupCrops = findViewById(R.id.chipGroupCrops)
+        setupCropChips()
+
         kpiRow = findViewById(R.id.kpiRow)
         tvKpiTotal = findViewById(R.id.tvKpiTotal)
         tvKpiClasses = findViewById(R.id.tvKpiClasses)
         tvKpiConf = findViewById(R.id.tvKpiConf)
         cardFreshness = findViewById(R.id.cardFreshness)
         freshnessItemsContainer = findViewById(R.id.freshnessItemsContainer)
+        layoutOverallFreshnessSummary = findViewById(R.id.layoutOverallFreshnessSummary)
         tvFreshnessModelMode = findViewById(R.id.tvFreshnessModelMode)
+        tvAnalysisCardTitle = findViewById(R.id.tvAnalysisCardTitle)
+        tvOverallRatingLabel = findViewById(R.id.tvOverallRatingLabel)
         tvOverallFreshness = findViewById(R.id.tvOverallFreshness)
         progressFreshnessOverall = findViewById(R.id.progressFreshnessOverall)
 
-        webView = findViewById(R.id.webView)
-        errorView = findViewById(R.id.errorView)
-        tvServerStatus = findViewById(R.id.tvServerStatus)
-        btnReloadWeb = findViewById(R.id.btnReloadWeb)
-        btnRetryWeb = findViewById(R.id.btnRetryWeb)
         btnConfigIp = findViewById(R.id.btnConfigIp)
+    }
 
-        tvServerStatus.text = webUrl
+    private fun setupCropChips() {
+        chipGroupCrops.removeAllViews()
+        for (crop in CropGrowthRepository.CROPS) {
+            val chip = Chip(this).apply {
+                text = "${crop.emoji} ${crop.name}"
+                isCheckable = true
+                isClickable = true
+                textSize = 11.5f
+                setChipBackgroundColorResource(android.R.color.transparent)
+                chipStrokeWidth = dpToPx(1).toFloat()
+                chipStrokeColor = android.content.res.ColorStateList.valueOf(Color.parseColor("#CBD5E1"))
+                setTextColor(Color.parseColor("#334155"))
+                isCheckedIconVisible = true
+
+                setOnCheckedChangeListener { _, isChecked ->
+                    if (isSyncingCropChips) return@setOnCheckedChangeListener
+                    if (isChecked) {
+                        selectedCropName = crop.name
+                        chipStrokeColor = android.content.res.ColorStateList.valueOf(Color.parseColor("#15803D"))
+                        setTextColor(Color.parseColor("#15803D"))
+                        updateFreshnessUI(lastDetectedItems, lastEstimates)
+                    } else {
+                        chipStrokeColor = android.content.res.ColorStateList.valueOf(Color.parseColor("#CBD5E1"))
+                        setTextColor(Color.parseColor("#334155"))
+                    }
+                }
+            }
+            chipGroupCrops.addView(chip)
+        }
+    }
+
+    private fun clearCurrentScan() {
+        lastAnalyzedBitmap = null
+        lastDetectedItems = emptyList()
+        lastEstimates = emptyList()
+        selectedCropName = null
+        ivPreview.setImageBitmap(null)
+        boxOverlay.clear()
+        placeholderLayout.visibility = View.VISIBLE
+        kpiRow.visibility = View.GONE
+        cardFreshness.visibility = View.GONE
+        freshnessItemsContainer.removeAllViews()
+
+        isSyncingCropChips = true
+        try {
+            for (i in 0 until chipGroupCrops.childCount) {
+                val chip = chipGroupCrops.getChildAt(i) as? Chip ?: continue
+                chip.isChecked = false
+                chip.chipStrokeColor = android.content.res.ColorStateList.valueOf(Color.parseColor("#CBD5E1"))
+                chip.setTextColor(Color.parseColor("#334155"))
+            }
+        } finally {
+            isSyncingCropChips = false
+        }
     }
 
     private fun setupListeners() {
         tabLayout.addOnTabSelectedListener(object : TabLayout.OnTabSelectedListener {
             override fun onTabSelected(tab: TabLayout.Tab?) {
+                clearCurrentScan()
                 when (tab?.position) {
                     0 -> {
-                        studioView.visibility = View.VISIBLE
-                        webViewContainer.visibility = View.GONE
+                        isCropGrowthMode = false
+                        layoutCropSelector.visibility = View.GONE
+                        tvStudioBadge.text = "🍎 PRODUCE QUALITY & SHELF-LIFE SCANNER"
+                        tvScanModeHint.text = "💡 Point camera or pick photo to evaluate freshness %, quality score, remaining shelf life, and storage strategy."
+                        btnCamera.text = "📷 Camera"
+                        tvPlaceholderEmoji.text = "🍅 🧄 🥔 🥒"
+                        tvPlaceholderTitle.text = "Capture or Choose Produce / Plant"
+                        tvPlaceholderSub.text = "AI detects produce, defect %, shelf life & growth stage"
+                        tvAnalysisCardTitle.text = "🍃 Analysis & Insights"
+                        tvOverallRatingLabel.text = "Overall Freshness"
                     }
                     1 -> {
-                        studioView.visibility = View.GONE
-                        webViewContainer.visibility = View.VISIBLE
-                        loadFreshAiWeb()
+                        isCropGrowthMode = true
+                        layoutCropSelector.visibility = View.VISIBLE
+                        tvStudioBadge.text = "🌱 CROP & PLANT GROWTH SCANNER"
+                        tvScanModeHint.text = "🌱 Point camera or pick photo of plant/crop to track growing days, stage, and days until harvest."
+                        btnCamera.text = "📷 Scan Plant"
+                        tvPlaceholderEmoji.text = "🌱 🌿 🪴 🌾"
+                        tvPlaceholderTitle.text = "Capture or Choose Plant Image"
+                        tvPlaceholderSub.text = "AI determines cultivation stage, growth timeline & days to harvest"
+                        tvAnalysisCardTitle.text = "🌱 Plant Growth & Harvest Insights"
+                        tvOverallRatingLabel.text = "Harvest Readiness"
                     }
                 }
             }
@@ -260,24 +355,6 @@ class MainActivity : AppCompatActivity() {
             override fun onTabUnselected(tab: TabLayout.Tab?) {}
             override fun onTabReselected(tab: TabLayout.Tab?) {}
         })
-
-        rgScanMode.setOnCheckedChangeListener { _, checkedId ->
-            if (checkedId == R.id.rbModeCropPlant) {
-                isCropGrowthMode = true
-                btnCamera.text = "📷 Scan Plant"
-                btnGallery.text = "🖼️ Gallery"
-                tvStudioBadge.text = "🌱 CROP & PLANT GROWTH SCANNER"
-                tvScanModeHint.text = "🌱 Crop Growth Mode: Directly scans your vegetable or fruit image to reveal its total growing days, stage, and days until harvest."
-            } else {
-                isCropGrowthMode = false
-                btnCamera.text = "📷 Camera"
-                btnGallery.text = "🖼️ Gallery"
-                tvStudioBadge.text = "STEP 1 • YOLO PRODUCE IDENTIFIER"
-                tvScanModeHint.text = "💡 Produce Mode: Evaluates freshness %, cellular quality score, remaining shelf life, and storage strategy."
-            }
-
-            updateFreshnessUI(lastDetectedItems, lastEstimates)
-        }
 
         btnCamera.setOnClickListener {
             checkAndLaunchCamera()
@@ -291,8 +368,11 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        btnReloadWeb.setOnClickListener { loadFreshAiWeb() }
-        btnRetryWeb.setOnClickListener { loadFreshAiWeb() }
+        btnCropLibrary.setOnClickListener { showCropLibraryDialog() }
+        btnPlantDoctor.setOnClickListener { showPlantDoctorDialog() }
+        btnHarvestTimeline.setOnClickListener { showHarvestTimelineDialog() }
+        btnExportReport.setOnClickListener { shareInspectionReport() }
+
         btnConfigIp.setOnClickListener { showIpConfigDialog() }
     }
 
@@ -382,9 +462,6 @@ class MainActivity : AppCompatActivity() {
                 val newHost = input.text.toString().trim()
                 if (newHost.isNotEmpty()) {
                     saveHost(newHost)
-                    if (webViewContainer.visibility == View.VISIBLE) {
-                        loadFreshAiWeb()
-                    }
                     Toast.makeText(this, "Saved host: $baseHost", Toast.LENGTH_SHORT).show()
                 }
             }
@@ -410,8 +487,17 @@ class MainActivity : AppCompatActivity() {
             var (detectedItems, freshnessEstimates) = runYoloInferenceOnServer(bitmap)
 
             if (detectedItems.isEmpty()) {
-                // Server offline -> Run locally on Android device
-                detectedItems = onDeviceDetector.detect(bitmap, confidence = 0.18f)
+                // Server offline -> Run locally on Android device with ONNX model
+                val rawItems = onDeviceDetector.detect(bitmap, confidence = 0.14f)
+                val imgW = bitmap.width.toFloat()
+                val imgH = bitmap.height.toFloat()
+                detectedItems = rawItems.filter { item ->
+                    val boxW = item.x2 - item.x1
+                    val boxH = item.y2 - item.y1
+                    val areaPct = (boxW * boxH) / (imgW * imgH)
+                    val isTinyEdgeArtifact = areaPct < 0.015f && (item.x1 <= 8f || item.y1 <= 8f || item.x2 >= imgW - 8f || item.y2 >= imgH - 8f)
+                    !isTinyEdgeArtifact
+                }
                 freshnessEstimates = detectedItems.map { item ->
                     FreshnessEstimate.estimateOnDevice(bitmap, item.x1, item.y1, item.x2, item.y2, item.className)
                 }
@@ -423,6 +509,16 @@ class MainActivity : AppCompatActivity() {
                 freshnessEstimates = detectedItems.map { item ->
                     FreshnessEstimate.estimateOnDevice(bitmap, item.x1, item.y1, item.x2, item.y2, item.className)
                 }
+            }
+
+            // In Plant Growth mode, if user selected a crop chip or wants to scan the plant, ensure we have a detection item
+            if (isCropGrowthMode && detectedItems.isEmpty()) {
+                val chosenCrop = selectedCropName ?: "Tomato"
+                val defaultBox = DetectedItem(chosenCrop, 0.95f, 0f, 0f, bitmap.width.toFloat(), bitmap.height.toFloat())
+                detectedItems = listOf(defaultBox)
+                freshnessEstimates = listOf(
+                    FreshnessEstimate.estimateOnDevice(bitmap, 0f, 0f, bitmap.width.toFloat(), bitmap.height.toFloat(), chosenCrop)
+                )
             }
 
             // Client-side containment & duplicate suppression
@@ -439,9 +535,19 @@ class MainActivity : AppCompatActivity() {
                 updateFreshnessUI(detectedItems, freshnessEstimates)
 
                 val summary = if (isCropGrowthMode) {
-                    val cropName = detectedItems.firstOrNull()?.className ?: "Tomato"
+                    val cropName = selectedCropName ?: detectedItems.firstOrNull()?.className ?: "Tomato"
                     val p = CropGrowthRepository.getProfile(cropName) ?: CropGrowthRepository.CROPS.first()
-                    "🌱 ${p.name} Plant: ${p.totalDurationRange} (~${p.averageDays} days to grow)"
+                    val item = detectedItems.firstOrNull()
+                    val est = PlantGrowthAnalyzer.analyze(
+                        bitmap,
+                        p.name,
+                        item?.x1 ?: 0f, item?.y1 ?: 0f,
+                        item?.x2 ?: bitmap.width.toFloat(), item?.y2 ?: bitmap.height.toFloat()
+                    )
+                    val rem = est.remainingDaysToHarvest
+                    val remStr = if (rem <= 0) "Harvest Ready NOW!" else "Ready in ~${rem} days"
+                    val stgName = est.currentStage.name
+                    "🌱 ${p.name}: $remStr ($stgName • ${est.progressPercent}% Matured)"
                 } else if (detectedItems.isNotEmpty()) {
                     val f = freshnessEstimates.firstOrNull()
                     val freshnessInfo = if (f != null) " • ${f.freshnesEmoji} ${f.stage}" else ""
@@ -692,8 +798,8 @@ class MainActivity : AppCompatActivity() {
 
         for (curr in pairs) {
             val c = curr.first
-            // Filter out low-confidence ghost boxes (< 22%)
-            if (c.confidence < 0.22f) continue
+            // Filter out low-confidence ghost boxes (< 12%)
+            if (c.confidence < 0.12f) continue
 
             val cArea = maxOf(1f, (c.x2 - c.x1) * (c.y2 - c.y1))
             var isDuplicate = false
@@ -752,6 +858,247 @@ class MainActivity : AppCompatActivity() {
     }
 
     /**
+     * Determines the exact produce type from image crop pixels using HSV & morphology analysis.
+     * Accurately distinguishes Garlic (Lehsun), Ginger (Adrak), Potato (Aloo), Onion (Pyaz),
+     * Carrot (Gajar), Cucumber (Kheera), Bell Pepper, Tomato, Eggplant, Lemon, Banana, Apple, etc.
+     */
+    private fun classifyProduceFromCrop(
+        bitmap: Bitmap,
+        x1: Float,
+        y1: Float,
+        x2: Float,
+        y2: Float,
+        candidateName: String? = null
+    ): String {
+        val bx1 = x1.toInt().coerceIn(0, bitmap.width - 1)
+        val by1 = y1.toInt().coerceIn(0, bitmap.height - 1)
+        val bx2 = x2.toInt().coerceIn(bx1 + 1, bitmap.width)
+        val by2 = y2.toInt().coerceIn(by1 + 1, bitmap.height)
+
+        val boxW = (bx2 - bx1).toFloat().coerceAtLeast(1f)
+        val boxH = (by2 - by1).toFloat().coerceAtLeast(1f)
+        val aspectRatio = maxOf(boxW / boxH, boxH / boxW)
+        val isElongated = aspectRatio > 1.75f
+        val cand = candidateName?.lowercase()?.trim() ?: ""
+
+        var count = 0
+        var tomatoRedCount = 0        // Crimson / Vine-Ripe Red / Breaker Red-Orange (Tomato)
+        var onionMagentaCount = 0     // Anthocyanin Violet / Magenta (Red Onion)
+        var onionPaperyGoldCount = 0  // Dry papery golden-tan tunic (Yellow Onion)
+        var garlicIvoryCount = 0      // Pearly ivory/white cloves (Garlic)
+        var potatoEarthyTanCount = 0  // Low-saturation earthy muted brown/tan (Potato)
+        var gingerBuffCount = 0       // Warm buff/tan fibrous rhizome (Ginger)
+        var carrotOrangeCount = 0     // Deep carrot orange taproot (Carrot)
+        var citrusOrangeCount = 0     // Citrus orange fruit
+        var lemonYellowCount = 0      // Bright yellow (Lemon / Banana)
+        var greenCount = 0            // Green (Cucumber / Capsicum / Raw produce)
+        var eggplantPurpleCount = 0   // Deep violet / dark eggplant
+
+        val hsvTemp = FloatArray(3)
+        // Sample a stable grid density. Dividing the area directly by the
+        // target count produces only a handful of pixels for large boxes.
+        val sampleArea = (bx2 - bx1).toDouble() * (by2 - by1).toDouble()
+        val step = maxOf(1, kotlin.math.sqrt(sampleArea / 2500.0).toInt())
+
+        // ─── TOP-ZONE NECK SCAN (same as YoloOnnxDetector) ──────────────────────────
+        val bboxHt = by2 - by1
+        val topEndM = (by1 + bboxHt * 0.22f).toInt().coerceIn(by1 + 1, by2)
+        var neckOchreM = 0; var neckTotalM = 0
+        val topStepM = maxOf(1, (bx2 - bx1) / 14)
+        for (nx in bx1 until bx2 step topStepM) {
+            for (ny in by1 until topEndM step topStepM) {
+                val p = bitmap.getPixel(nx, ny)
+                val nr = Color.red(p); val ng = Color.green(p); val nb = Color.blue(p)
+                if ((nr > 248 && ng > 248 && nb > 248) || (nr < 10 && ng < 10 && nb < 10)) { neckTotalM++; continue }
+                Color.RGBToHSV(nr, ng, nb, hsvTemp)
+                val nh = hsvTemp[0]; val ns = hsvTemp[1]; val nv = hsvTemp[2]
+                if (nh in 20f..68f && ns in 0.10f..0.82f && nv in 0.14f..0.82f && nr > ng && ng > nb && (nr - ng) > 7 && (ng - nb) > 5) {
+                    neckOchreM++
+                }
+                neckTotalM++
+            }
+        }
+        val neckOchrePctM = if (neckTotalM > 2) neckOchreM.toFloat() / neckTotalM else 0f
+        // ─────────────────────────────────────────────────────────────────────────────
+
+        for (px in bx1 until bx2 step step) {
+            for (py in by1 until by2 step step) {
+                val pixel = bitmap.getPixel(px, py)
+                val r = Color.red(pixel)
+                val g = Color.green(pixel)
+                val b = Color.blue(pixel)
+
+                // Skip glare highlights or deep black shadows
+                if ((r > 248 && g > 248 && b > 248) || (r < 12 && g < 12 && b < 12)) continue
+
+                Color.RGBToHSV(r, g, b, hsvTemp)
+                val h = hsvTemp[0] // 0..360
+                val s = hsvTemp[1] // 0..1
+                val v = hsvTemp[2] // 0..1
+
+                // Skip floor/table background (tiles, wood, marble, cement, peach/tan surfaces)
+                val isFloor = (s < 0.24f && v > 0.45f) ||
+                        (Math.abs(r - g) < 22 && Math.abs(g - b) < 22 && s < 0.25f) ||
+                        v < 0.08f || v > 0.96f
+                if (isFloor) continue
+
+                // 1. Red / Maroon Onion (Pyaz): anthocyanin violet/purple OR dark maroon red onion skin
+                // KEY: Checked FIRST so dark reddish onion skin (v <= 0.62, r < 195) is captured as onion,
+                // and does NOT get stolen by isTomato.
+                if (
+                    (h in 260f..350f && s >= 0.16f && v >= 0.14f) ||
+                    (h in 345f..360f && s in 0.16f..0.60f && v in 0.20f..0.80f && b > 45 && r < 140) ||
+                    ((h <= 22f || h >= 340f) && s in 0.25f..0.85f && v in 0.12f..0.62f && r < 195 && r > g + 8)
+                ) {
+                    onionMagentaCount++
+                }
+                // 2. Yellow/Brown Onion: Dry papery golden/copper husk
+                else if (h in 18f..50f && s in 0.18f..0.78f && v in 0.20f..0.82f &&
+                         r in 100..220 && g in 68..172 && b in 14..115 &&
+                         (r - g) in 14..65 && (g - b) in 25..82) {
+                    onionPaperyGoldCount++
+                }
+                // 3. Tomato (Tamatar): Deep vivid crimson/red or genuine breaker orange
+                // Only bright, vivid reds reach here (v > 0.55, r > 155, high saturation)
+                else if (
+                    ((h <= 18f || h >= 345f) && s >= 0.45f && v >= 0.55f &&
+                     r > 155 && r > g + 40 && r > b + 40 && b < 85) ||
+                    (h in 5f..28f && s >= 0.48f && v >= 0.35f &&
+                     r > 155 && r > g + 30 && b < 75 &&
+                     (r.toFloat() / maxOf(1, b).toFloat()) > 3.0f)
+                ) {
+                    tomatoRedCount++
+                }
+                // 4. Garlic (Lehsun): Papery ivory / pearl-white / light cream (high value, low saturation, warm tint)
+                else if (s in 0.04f..0.18f && v in 0.65f..0.98f && r in 170..245 && g in 160..242 && b in 140..230 && r >= g && g >= b && (r - b in 12..35)) {
+                    garlicIvoryCount++
+                }
+                // 5. Potato (Aloo): Earthy neutral tan/gray-brown (muted saturation, balanced)
+                else if (s in 0.10f..0.28f && v in 0.28f..0.72f && r in 80..185 && g in 65..165 && b in 45..135 && Math.abs(r - g) < 26 && Math.abs(g - b) < 32) {
+                    potatoEarthyTanCount++
+                }
+                // 6. Ginger (Adrak): Warm buff-tan / light golden fibrous rhizome
+                else if (h in 24f..46f && s in 0.22f..0.54f && v in 0.42f..0.82f && r in 125..215 && g in 90..175 && b in 30..115 && (r - g in 18..52) && (g - b in 30..80)) {
+                    gingerBuffCount++
+                }
+                // 7. Carrot (Gajar): Vivid deep orange
+                else if (h in 14f..34f && s > 0.60f && r > 175 && g in 75..145 && b < 70) {
+                    carrotOrangeCount++
+                }
+                // 8. Citrus Orange fruit
+                else if (h in 16f..38f && s > 0.55f && r > 180 && g in 95..160 && b < 80) {
+                    citrusOrangeCount++
+                }
+                // 9. Eggplant / Brinjal: Dark violet / deep purple
+                else if ((h in 250f..320f && v in 0.10f..0.45f) || (r in 35..110 && b in 40..120 && g < 50)) {
+                    eggplantPurpleCount++
+                }
+                // 10. Bright Yellow (Lemon / Banana)
+                else if (h in 45f..68f && s > 0.32f && r > 160 && g > 135 && b < 130) {
+                    lemonYellowCount++
+                }
+                // 11. Green Produce (Cucumber / Capsicum / Raw Produce / Vine)
+                else if ((g > r && g > b) || (h in 65f..160f && s > 0.18f)) {
+                    greenCount++
+                }
+
+                count++
+            }
+        }
+
+        if (count < 8) {
+            return if (candidateName != null && candidateName.isNotEmpty() && !candidateName.equals("produce", ignoreCase = true)) {
+                candidateName
+            } else "Tomato"
+        }
+
+        val tomatoPct = tomatoRedCount.toFloat() / count
+        val mOnionPct = onionMagentaCount.toFloat() / count
+        val yOnionPct = onionPaperyGoldCount.toFloat() / count
+        val garlicPct = garlicIvoryCount.toFloat() / count
+        val potatoPct = potatoEarthyTanCount.toFloat() / count
+        val gingerPct = gingerBuffCount.toFloat() / count
+        val carrotPct = carrotOrangeCount.toFloat() / count
+        val orangePct = citrusOrangeCount.toFloat() / count
+        val eggplantPct = eggplantPurpleCount.toFloat() / count
+        val yellowPct = lemonYellowCount.toFloat() / count
+        val greenPct = greenCount.toFloat() / count
+
+        val onionTotalPct = mOnionPct + yOnionPct
+
+        // ── Scientific Relative Decision Engine ──
+
+        // PRIORITY 0: Neck/stalk ochre check — most reliable onion indicator
+        if (neckOchrePctM > 0.25f) {
+            return "Onion"
+        }
+
+        // PRIORITY 1: Onion traits clearly dominate over tomato
+        if (onionTotalPct > 0.08f && onionTotalPct >= tomatoPct * 0.70f) {
+            return "Onion"
+        }
+        if (mOnionPct > 0.12f) {
+            return "Onion"
+        }
+
+        // PRIORITY 2: If candidate was labeled tomato, but pixel analysis shows onion
+        if ((cand == "tomato" || cand == "tamatar") && (onionTotalPct > 0.05f && onionTotalPct >= tomatoPct * 0.50f)) {
+            return "Onion"
+        }
+        if ((cand == "tomato" || cand == "tamatar") && neckOchrePctM > 0.15f) {
+            return "Onion"
+        }
+
+        // 1. Tomato: Only when genuine strong tomato pixels clearly dominate
+        if (tomatoPct > 0.08f && tomatoPct > onionTotalPct * 1.5f && neckOchrePctM < 0.18f &&
+            (cand != "onion" && cand != "pyaz")) {
+            return if (cand == "apple") "Apple" else "Tomato"
+        }
+        // Confirm Tomato if model said tomato, pixel confirms it, neck is clean
+        if ((cand == "tomato" || cand == "tamatar") && tomatoPct > 0.08f &&
+            tomatoPct > onionTotalPct * 1.5f && neckOchrePctM < 0.15f) {
+            return "Tomato"
+        }
+
+        // 2. Onion: True anthocyanin violet, dark maroon, or dry papery copper tunic
+        val hasOnionTraits = (mOnionPct > 0.05f || onionMagentaCount >= 4) ||
+                             (yOnionPct > 0.12f && onionPaperyGoldCount >= 6 && tomatoPct < 0.04f)
+        if ((cand == "onion" || cand == "pyaz") && tomatoPct < 0.15f) {
+            return "Onion"
+        }
+        if (hasOnionTraits && tomatoPct < 0.15f) {
+            return "Onion"
+        }
+
+        // 3. Garlic: Only when ivory/white clove scales strongly dominate and there are NO onion tunic colors
+        if (garlicPct > 0.35f && garlicPct > potatoPct && !hasOnionTraits && cand != "onion") {
+            return "Garlic"
+        }
+
+        // 4. Specialized Produce Shapes & Colors
+        if (eggplantPct > 0.15f) return "Eggplant"
+        if (isElongated && carrotPct > 0.15f) return "Carrot"
+        if (isElongated && greenPct > 0.20f) return "Cucumber"
+        if (isElongated && yellowPct > 0.18f) return "Banana"
+
+        // 5. Roots & Tubers
+        if (gingerPct > 0.18f && potatoPct < 0.15f) return "Ginger"
+        if (potatoPct > 0.16f) return "Potato"
+        if (orangePct > 0.18f) return if (cand == "carrot") "Carrot" else "Orange"
+        if (yellowPct > 0.18f) return "Lemon"
+        if (greenPct > 0.22f) return if (cand == "watermelon") "Watermelon" else if (cand == "bell pepper") "Bell Pepper" else "Tomato"
+
+        // Candidate fallback
+        if (candidateName != null && candidateName.isNotEmpty() && !candidateName.equals("produce", ignoreCase = true)) {
+            return candidateName
+        }
+        if (onionTotalPct > 0.04f || mOnionPct > 0.04f) {
+            return "Onion"
+        }
+        return "Tomato"
+    }
+
+    /**
      * Client-side safety net: if YOLO/server returns a non-produce label (Vase, Bowl, etc.),
      * use pixel color analysis of the bounding box crop to determine the correct produce name.
      */
@@ -764,59 +1111,34 @@ class MainActivity : AppCompatActivity() {
             "stop sign", "person", "car", "truck", "bicycle", "dog", "cat", "bird"
         )
 
-        val lowerClass = rawClass.lowercase()
-        if (!nonProduceLabels.contains(lowerClass)) return rawClass
+        val lowerClass = rawClass.lowercase().trim()
+        val validProduce = setOf(
+            "tomato", "potato", "garlic", "ginger", "apple", "banana",
+            "orange", "lemon", "carrot", "cucumber", "eggplant", "watermelon",
+            "bell pepper", "pepper", "strawberry", "mango"
+        )
 
-        val bx1 = x1.toInt().coerceIn(0, bitmap.width - 1)
-        val by1 = y1.toInt().coerceIn(0, bitmap.height - 1)
-        val bx2 = x2.toInt().coerceIn(bx1 + 1, bitmap.width)
-        val by2 = y2.toInt().coerceIn(by1 + 1, bitmap.height)
-
-        val boxW = (bx2 - bx1).toFloat().coerceAtLeast(1f)
-        val boxH = (by2 - by1).toFloat().coerceAtLeast(1f)
-        val isElongatedRod = (boxW / boxH > 2.5f) || (boxH / boxW > 2.5f)
-
-        var sumR = 0L; var sumG = 0L; var sumB = 0L; var count = 0
-        val step = 4
-        for (px in bx1 until bx2 step step) {
-            for (py in by1 until by2 step step) {
-                val pixel = bitmap.getPixel(px, py)
-                sumR += Color.red(pixel); sumG += Color.green(pixel); sumB += Color.blue(pixel); count++
-            }
+        // For Onion → always verify with pixel color (might actually be a tomato)
+        if (lowerClass == "onion" || lowerClass == "pyaz") {
+            return classifyProduceFromCrop(bitmap, x1, y1, x2, y2, rawClass)
         }
-        if (count == 0) return "Tomato"
 
-        val r = (sumR / count).toInt()
-        val g = (sumG / count).toInt()
-        val b = (sumB / count).toInt()
-        val maxC = maxOf(r, g, b).toFloat()
-        val minC = minOf(r, g, b).toFloat()
-        val sat = if (maxC > 0) (maxC - minC) / maxC else 0f
-
-        return when {
-            // 1. Ripe / Pink / Crimson Tomato (Red significantly dominates Blue & Green)
-            (r > 130 && r > g + 15 && r > b + 25) || (r > 150 && g < 110) -> "Tomato"
-            // 2. Green produce: Only elongated rods are Cucumbers. All round/oval green produce are Tomatoes (Raw Green Tomato)!
-            (g > r && g > b) || (g > 85 && g > b + 8) -> {
-                if (isElongatedRod) "Cucumber" else "Tomato"
-            }
-            // 3. Red Onion: Distinct magenta / purple / violet hue (blue is distinctly high relative to green)
-            (r in 100..185 && b > 75 && (b >= g - 5 || (r - g > 35 && b > 70))) -> "Onion"
-            // 4. Yellow / Golden Onion: Papery brownish-yellow husk (R > G > B with dry warm ochre tone)
-            (r in 135..210 && g in 95..160 && b in 40..95 && (r - g in 20..55) && (g - b in 35..80)) -> "Onion"
-            // 5. Citrus / Orange: Warm vibrant orange (R very high, G around 85-135, B very low)
-            (r > 170 && g in 85..135 && b < 65) -> "Orange"
-            // 6. Banana: Bright yellow (R and G both high, B low)
-            (r > 165 && g > 140 && b < 100) -> "Banana"
-            // 7. Lemon: Acidic bright pale yellow
-            (r > 165 && g > 135 && b in 40..90 && sat > 0.25f) -> "Lemon"
-            // 8. Apple: Deep crimson or bi-color
-            (r > 160 && g < 90 && sat > 0.40f) -> "Apple"
-            // 9. Potato: Earthy neutral tan/brown with very low saturation
-            (sat < 0.14f && Math.abs(r - g) < 14 && r in 100..165) -> "Potato"
-            // Default produce fallback: Tomato
-            else -> "Tomato"
+        // For Tomato → also verify with pixel color (might actually be an onion)
+        // This catches the case where the YOLO model outputs "Tomato" for a golden-brown onion
+        if (lowerClass == "tomato" || lowerClass == "tamatar") {
+            return classifyProduceFromCrop(bitmap, x1, y1, x2, y2, rawClass)
         }
+
+        // If the detector already identified another valid produce type, preserve it!
+        if (validProduce.contains(lowerClass)) {
+            return rawClass
+        }
+
+        if (!nonProduceLabels.contains(lowerClass) && lowerClass.isNotEmpty() && lowerClass != "produce") {
+            return classifyProduceFromCrop(bitmap, x1, y1, x2, y2, rawClass)
+        }
+
+        return classifyProduceFromCrop(bitmap, x1, y1, x2, y2, null)
     }
 
     private fun runOnDeviceProduceDetection(bitmap: Bitmap): List<DetectedItem> {
@@ -830,10 +1152,8 @@ class MainActivity : AppCompatActivity() {
         var maxY = 0f
         var foundCount = 0
 
-        var sumR = 0L
-        var sumG = 0L
-        var sumB = 0L
         val step = 8
+        val hsvTemp = FloatArray(3)
 
         for (x in (w * 0.05f).toInt() until (w * 0.95f).toInt() step step) {
             for (y in (h * 0.05f).toInt() until (h * 0.95f).toInt() step step) {
@@ -842,24 +1162,26 @@ class MainActivity : AppCompatActivity() {
                 val g = Color.green(p)
                 val b = Color.blue(p)
 
-                val maxC = maxOf(r, g, b)
-                val minC = minOf(r, g, b)
-                val sat = if (maxC > 0) (maxC - minC).toFloat() / maxC else 0f
+                Color.RGBToHSV(r, g, b, hsvTemp)
+                val hue = hsvTemp[0]
+                val sat = hsvTemp[1]
+                val value = hsvTemp[2]
 
-                // Ignore neutral background (concrete floor, table, shadows: low saturation or neutral gray/tan)
-                val isNeutralFloor = (Math.abs(r - g) < 14 && Math.abs(g - b) < 14) || sat < 0.16f
-                if (isNeutralFloor) continue
+                // Ignore background (concrete floor, peach/tan tiles, table, shadows: low saturation or neutral gray/tan)
+                val isFloor = (sat < 0.24f && value > 0.45f) ||
+                        (Math.abs(r - g) < 22 && Math.abs(g - b) < 22 && sat < 0.25f) ||
+                        value < 0.08f || value > 0.96f
+                if (isFloor) continue
 
-                val isProduceColor = (r > 105 && r > g + 12 && (r - b) > 10) || // Red/pink/violet produce
-                        (r > 125 && g > 90 && b < 80 && sat > 0.22f) ||           // Yellow/amber produce
-                        (g > 85 && g > b + 8 && sat > 0.16f) ||                    // Raw green tomato & green produce
-                        (r > 140 && g < 110 && b < 110)                            // Strong red
+                val isProduceColor = (hue in 260f..355f && sat > 0.10f) ||   // Onion violet/magenta
+                        (hue in 14f..48f && sat in 0.16f..0.85f) ||           // Onion ochre/tan or Orange
+                        (hue in 45f..68f && sat > 0.25f) ||                   // Banana/Lemon yellow
+                        (hue in 65f..160f && sat > 0.16f) ||                  // Green produce
+                        ((hue <= 14f || hue >= 348f) && sat > 0.28f) ||      // Red produce
+                        (value in 0.08f..0.42f && sat < 0.45f && (r < 115 || g < 110 || b < 110)) // Produce dark rot/mold/decay blemishes
 
                 if (isProduceColor) {
                     foundCount++
-                    sumR += r
-                    sumG += g
-                    sumB += b
                     if (x < minX) minX = x.toFloat()
                     if (x > maxX) maxX = x.toFloat()
                     if (y < minY) minY = y.toFloat()
@@ -868,87 +1190,29 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        if (foundCount > 20 && maxX > minX && maxY > minY) {
-            val avgR = (sumR / foundCount).toInt()
-            val avgG = (sumG / foundCount).toInt()
-            val avgB = (sumB / foundCount).toInt()
+        val boxX1: Float
+        val boxY1: Float
+        val boxX2: Float
+        val boxY2: Float
 
-            val maxVal = maxOf(avgR, avgG, avgB).toFloat()
-            val minVal = minOf(avgR, avgG, avgB).toFloat()
-            val satVal = if (maxVal > 0) (maxVal - minVal) / maxVal else 0f
-
-            val boxWidth = (maxX - minX).coerceAtLeast(1f)
-            val boxHeight = (maxY - minY).coerceAtLeast(1f)
-            // A cucumber is an elongated rod where length is >= 2.5x width
-            val isElongatedRod = (boxWidth / boxHeight > 2.5f) || (boxHeight / boxWidth > 2.5f)
-
-            var detectedClass = "Tomato"
-            var confidence = 0.94f
-
-            // 1. Ripe / Half-Ripe Tomato: Dominant red with clear margin over green and blue
-            val isRipeTomato = (avgR > 135 && avgR > avgG + 15 && avgR > avgB + 25) || (avgR > 150 && avgG < 115)
-
-            // 2. Green Produce (Raw Tomato or Cucumber):
-            val isGreenProduce = (avgG > avgR && avgG > avgB) || (avgG > 85 && avgG > avgB + 8)
-
-            // 3. Red Onion: Magenta / violet / purple skin with high blue channel
-            val isRedOnion = (avgR in 105..185 && avgB > 75 && (avgB >= avgG - 5 || (avgR - avgG > 40 && avgB > 70)))
-
-            // 4. Yellow Onion: Warm ochre/tan dry papery skin
-            val isYellowOnion = (avgR in 135..210 && avgG in 95..160 && avgB in 40..100 && (avgR - avgG in 22..55) && (avgG - avgB in 35..80))
-
-            // 5. Banana: Bright yellow
-            val isBanana = (avgR > 165 && avgG > 135 && avgB < 100)
-
-            // 6. Orange: Saturated orange
-            val isOrange = (avgR > 170 && avgG in 85..135 && avgB < 65)
-
-            // 7. Potato: Neutral earthy grayish tan
-            val isPotato = (satVal < 0.14f && Math.abs(avgR - avgG) < 14 && avgR in 100..165)
-
-            when {
-                isRipeTomato -> {
-                    detectedClass = "Tomato"
-                    confidence = 0.96f
-                }
-                isGreenProduce -> {
-                    // Only long skinny cylindrical shapes are Cucumbers! Round/oval green produce is Tomato (raw tomato)!
-                    detectedClass = if (isElongatedRod) "Cucumber" else "Tomato"
-                    confidence = 0.95f
-                }
-                isRedOnion || isYellowOnion -> {
-                    detectedClass = "Onion"
-                    confidence = 0.94f
-                }
-                isBanana -> {
-                    detectedClass = "Banana"
-                    confidence = 0.95f
-                }
-                isOrange -> {
-                    detectedClass = "Orange"
-                    confidence = 0.94f
-                }
-                isPotato -> {
-                    detectedClass = "Potato"
-                    confidence = 0.90f
-                }
-                else -> {
-                    detectedClass = "Tomato"
-                    confidence = 0.92f
-                }
-            }
-
-            // Tight bounding box framing just the produce item
-            val pad = ((maxX - minX) * 0.04f).coerceIn(4f, 18f)
-            val boxX1 = (minX - pad).coerceAtLeast(0f)
-            val boxY1 = (minY - pad).coerceAtLeast(0f)
-            val boxX2 = (maxX + pad).coerceAtMost(w)
-            val boxY2 = (maxY + pad).coerceAtMost(h)
-
-            items.add(DetectedItem(detectedClass, confidence, boxX1, boxY1, boxX2, boxY2))
+        if (foundCount > 15 && maxX > minX && maxY > minY) {
+            val padX = ((maxX - minX) * 0.08f).coerceIn(6f, 25f)
+            val padY = ((maxY - minY) * 0.08f).coerceIn(6f, 25f)
+            boxX1 = (minX - padX).coerceAtLeast(0f)
+            boxY1 = (minY - padY).coerceAtLeast(0f)
+            boxX2 = (maxX + padX).coerceAtMost(w)
+            boxY2 = (maxY + padY).coerceAtMost(h)
         } else {
-            items.add(DetectedItem("Tomato", 0.88f, w * 0.25f, h * 0.25f, w * 0.75f, h * 0.75f))
+            // Default center framed crop
+            boxX1 = w * 0.20f
+            boxY1 = h * 0.20f
+            boxX2 = w * 0.80f
+            boxY2 = h * 0.80f
         }
+
+        val detectedClass = classifyProduceFromCrop(bitmap, boxX1, boxY1, boxX2, boxY2, null)
+        val confidence = if (foundCount > 15) 0.94f else 0.88f
+        items.add(DetectedItem(detectedClass, confidence, boxX1, boxY1, boxX2, boxY2))
 
         return items
     }
@@ -986,10 +1250,32 @@ class MainActivity : AppCompatActivity() {
             // ==========================================
             // 🌱 CROP & PLANT GROWTH SCANNER MODE
             // ==========================================
-            tvFreshnessModelMode.text = "🌱 Crop & Plant Growth Intelligence"
+            tvFreshnessModelMode.text = "🌱 Agronomy AI Engine"
+            layoutOverallFreshnessSummary.visibility = View.GONE
 
-            val cropToAnalyze = items.firstOrNull()?.className ?: "Tomato"
+            val cropToAnalyze = selectedCropName ?: items.firstOrNull()?.className ?: "Tomato"
             val p = CropGrowthRepository.getProfile(cropToAnalyze) ?: CropGrowthRepository.CROPS.first()
+
+            // Synchronize chip selection with detected or selected crop
+            isSyncingCropChips = true
+            try {
+                for (i in 0 until chipGroupCrops.childCount) {
+                    val chip = chipGroupCrops.getChildAt(i) as? Chip ?: continue
+                    val match = chip.text.contains(p.name, ignoreCase = true)
+                    if (chip.isChecked != match) {
+                        chip.isChecked = match
+                    }
+                    if (match) {
+                        chip.chipStrokeColor = android.content.res.ColorStateList.valueOf(Color.parseColor("#15803D"))
+                        chip.setTextColor(Color.parseColor("#15803D"))
+                    } else {
+                        chip.chipStrokeColor = android.content.res.ColorStateList.valueOf(Color.parseColor("#CBD5E1"))
+                        chip.setTextColor(Color.parseColor("#334155"))
+                    }
+                }
+            } finally {
+                isSyncingCropChips = false
+            }
 
             val plantEst = if (bitmap != null) {
                 val item = items.firstOrNull()
@@ -1012,20 +1298,6 @@ class MainActivity : AppCompatActivity() {
                 )
             }
 
-            val isFruit = p.category.equals("Fruit", ignoreCase = true)
-            val categoryColor = if (isFruit) "#C2410C" else "#15803D"
-            val categoryBg = if (isFruit) "#EA580C" else "#15803D"
-
-            val remainingStr = if (plantEst.remainingDaysToHarvest > 0) "~${plantEst.remainingDaysToHarvest}d to harvest" else "Harvest Ready"
-            tvOverallFreshness.text = "${p.emoji} ${p.name} (${p.category}) • ⏱️ ${p.totalDurationRange} (~${p.averageDays}d) • $remainingStr"
-            tvOverallFreshness.setTextColor(Color.parseColor(categoryColor))
-            progressFreshnessOverall.progress = plantEst.progressPercent
-            android.graphics.PorterDuffColorFilter(
-                Color.parseColor(categoryBg), android.graphics.PorterDuff.Mode.SRC_IN
-            ).also { filter ->
-                progressFreshnessOverall.progressDrawable.colorFilter = filter
-            }
-
             val dummyItem = items.firstOrNull() ?: DetectedItem(p.name, 1.0f, 0f, 0f, 100f, 100f)
             val card = buildPlantGrowthCard(dummyItem, plantEst)
             freshnessItemsContainer.addView(card)
@@ -1033,6 +1305,7 @@ class MainActivity : AppCompatActivity() {
             // ==========================================
             // 🍎 HARVESTED PRODUCE FRESHNESS MODE
             // ==========================================
+            layoutOverallFreshnessSummary.visibility = View.VISIBLE
             val mode = estimates.firstOrNull()?.modelMode ?: "heuristic"
             tvFreshnessModelMode.text = if (mode == "convnext") "🧠 ConvNeXt-Tiny" else "🎨 Heuristic"
 
@@ -1065,7 +1338,7 @@ class MainActivity : AppCompatActivity() {
         val ctx = this
         val container = LinearLayout(ctx).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(0, 0, 0, dpToPx(12))
+            setPadding(0, 0, 0, dpToPx(4))
         }
 
         // Row 1: Emoji + Name + Freshness Badge
@@ -1079,13 +1352,13 @@ class MainActivity : AppCompatActivity() {
 
         val tvEmoji = android.widget.TextView(ctx).apply {
             text = fr.freshnesEmoji
-            textSize = 22f
-            setPadding(0, 0, dpToPx(8), 0)
+            textSize = 20f
+            setPadding(0, 0, dpToPx(6), 0)
         }
 
         val tvName = android.widget.TextView(ctx).apply {
             text = item.className
-            textSize = 13f
+            textSize = 12.5f
             setTextColor(Color.parseColor("#0F172A"))
             setTypeface(null, android.graphics.Typeface.BOLD)
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
@@ -1093,10 +1366,10 @@ class MainActivity : AppCompatActivity() {
 
         val tvBadge = android.widget.TextView(ctx).apply {
             text = fr.stage
-            textSize = 11f
+            textSize = 10.5f
             setTextColor(Color.WHITE)
             setTypeface(null, android.graphics.Typeface.BOLD)
-            setPadding(dpToPx(10), dpToPx(4), dpToPx(10), dpToPx(4))
+            setPadding(dpToPx(8), dpToPx(3), dpToPx(8), dpToPx(3))
             background = android.graphics.drawable.GradientDrawable().apply {
                 shape = android.graphics.drawable.GradientDrawable.RECTANGLE
                 cornerRadius = dpToPx(100).toFloat()
@@ -1112,13 +1385,13 @@ class MainActivity : AppCompatActivity() {
         if (fr.defectAreaPct > 0f) {
             val tvDefect = android.widget.TextView(ctx).apply {
                 text = "Defect: ${String.format("%.1f", fr.defectAreaPct)}%"
-                textSize = 10f
+                textSize = 9.5f
                 setTextColor(Color.parseColor(if (fr.defectAreaPct > 10f) "#DC2626" else "#D97706"))
                 setTypeface(null, android.graphics.Typeface.BOLD)
-                setPadding(dpToPx(6), dpToPx(3), dpToPx(6), dpToPx(3))
+                setPadding(dpToPx(5), dpToPx(2), dpToPx(5), dpToPx(2))
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT
-                ).apply { marginStart = dpToPx(6) }
+                ).apply { marginStart = dpToPx(4) }
                 background = android.graphics.drawable.GradientDrawable().apply {
                     shape = android.graphics.drawable.GradientDrawable.RECTANGLE
                     cornerRadius = dpToPx(100).toFloat()
@@ -1132,9 +1405,9 @@ class MainActivity : AppCompatActivity() {
         // Row 2: Freshness progress bar + score
         val tvScore = android.widget.TextView(ctx).apply {
             text = "Freshness: ${fr.freshnessScore}/100  •  ${(fr.probability * 100).toInt()}% confidence"
-            textSize = 11f
+            textSize = 10.5f
             setTextColor(Color.parseColor("#475569"))
-            setPadding(0, dpToPx(6), 0, dpToPx(3))
+            setPadding(0, dpToPx(3), 0, dpToPx(2))
         }
         container.addView(tvScore)
 
@@ -1142,8 +1415,8 @@ class MainActivity : AppCompatActivity() {
             max = 100
             progress = fr.freshnessScore
             layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, dpToPx(8)
-            ).apply { bottomMargin = dpToPx(8) }
+                LinearLayout.LayoutParams.MATCH_PARENT, dpToPx(6)
+            ).apply { bottomMargin = dpToPx(4) }
             android.graphics.PorterDuffColorFilter(
                 fr.badgeColor(), android.graphics.PorterDuff.Mode.SRC_IN
             ).also { filter -> progressDrawable.colorFilter = filter }
@@ -1161,7 +1434,7 @@ class MainActivity : AppCompatActivity() {
 
         val tvRipeness = android.widget.TextView(ctx).apply {
             text = "${fr.ripenessEmoji} ${fr.ripenessStage}"
-            textSize = 11f
+            textSize = 10.5f
             setTextColor(Color.parseColor("#334155"))
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
         }
@@ -1169,13 +1442,13 @@ class MainActivity : AppCompatActivity() {
         val arrhenius = fr.calculateArrheniusShelfLife(tempC = 22f)
         val tvShelf = android.widget.TextView(ctx).apply {
             text = "🌡️ Arrhenius: ${arrhenius.summary}"
-            textSize = 11f
+            textSize = 10.5f
             setTextColor(Color.parseColor("#166534"))
             setTypeface(null, android.graphics.Typeface.BOLD)
-            setPadding(dpToPx(10), dpToPx(3), dpToPx(10), dpToPx(3))
+            setPadding(dpToPx(8), dpToPx(2), dpToPx(8), dpToPx(2))
             background = android.graphics.drawable.GradientDrawable().apply {
                 shape = android.graphics.drawable.GradientDrawable.RECTANGLE
-                cornerRadius = dpToPx(8).toFloat()
+                cornerRadius = dpToPx(6).toFloat()
                 setColor(Color.parseColor("#F0FDF4"))
                 setStroke(dpToPx(1), Color.parseColor("#86EFAC"))
             }
@@ -1191,18 +1464,18 @@ class MainActivity : AppCompatActivity() {
                 orientation = LinearLayout.VERTICAL
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
-                ).apply { topMargin = dpToPx(8); bottomMargin = dpToPx(4) }
-                setPadding(dpToPx(10), dpToPx(8), dpToPx(10), dpToPx(8))
+                ).apply { topMargin = dpToPx(4); bottomMargin = dpToPx(2) }
+                setPadding(dpToPx(8), dpToPx(6), dpToPx(8), dpToPx(6))
                 background = android.graphics.drawable.GradientDrawable().apply {
                     shape = android.graphics.drawable.GradientDrawable.RECTANGLE
-                    cornerRadius = dpToPx(10).toFloat()
+                    cornerRadius = dpToPx(8).toFloat()
                     setColor(Color.parseColor("#0F172A"))
                 }
             }
 
             val tvStructHeader = android.widget.TextView(ctx).apply {
                 text = "📊 Quality & Storage Intelligence"
-                textSize = 10.5f
+                textSize = 10f
                 setTextColor(Color.parseColor("#38BDF8"))
                 setTypeface(null, android.graphics.Typeface.BOLD)
             }
@@ -1212,7 +1485,7 @@ class MainActivity : AppCompatActivity() {
                 orientation = LinearLayout.HORIZONTAL
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
-                ).apply { topMargin = dpToPx(4) }
+                ).apply { topMargin = dpToPx(3) }
             }
 
             fun addMetricCol(label: String, value: String, colorHex: String, sub: String) {
@@ -1220,22 +1493,22 @@ class MainActivity : AppCompatActivity() {
                     orientation = LinearLayout.VERTICAL
                     gravity = android.view.Gravity.CENTER
                     layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-                    setPadding(dpToPx(2), dpToPx(2), dpToPx(2), dpToPx(2))
+                    setPadding(dpToPx(1), dpToPx(1), dpToPx(1), dpToPx(1))
                 }
                 val tvL = android.widget.TextView(ctx).apply {
                     text = label
-                    textSize = 8f
+                    textSize = 7.5f
                     setTextColor(Color.parseColor("#94A3B8"))
                 }
                 val tvV = android.widget.TextView(ctx).apply {
                     text = value
-                    textSize = 11.5f
+                    textSize = 11f
                     setTextColor(Color.parseColor(colorHex))
                     setTypeface(null, android.graphics.Typeface.BOLD)
                 }
                 val tvS = android.widget.TextView(ctx).apply {
                     text = sub
-                    textSize = 7f
+                    textSize = 6.5f
                     setTextColor(Color.parseColor("#64748B"))
                 }
                 col.addView(tvL)
@@ -1266,9 +1539,9 @@ class MainActivity : AppCompatActivity() {
 
             val tvAgeDetail = android.widget.TextView(ctx).apply {
                 text = "🧬 Bio Age: $bioAgeVal • State: ${fr.ripenessStage} (${fr.stage})"
-                textSize = 9.5f
+                textSize = 9f
                 setTextColor(Color.parseColor("#94A3B8"))
-                setPadding(dpToPx(4), dpToPx(5), dpToPx(4), 0)
+                setPadding(dpToPx(2), dpToPx(3), dpToPx(2), 0)
             }
             structCard.addView(tvAgeDetail)
             container.addView(structCard)
@@ -1280,11 +1553,11 @@ class MainActivity : AppCompatActivity() {
                 orientation = LinearLayout.VERTICAL
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
-                ).apply { topMargin = dpToPx(6); bottomMargin = dpToPx(6) }
-                setPadding(dpToPx(10), dpToPx(8), dpToPx(10), dpToPx(8))
+                ).apply { topMargin = dpToPx(4); bottomMargin = dpToPx(2) }
+                setPadding(dpToPx(8), dpToPx(6), dpToPx(8), dpToPx(6))
                 background = android.graphics.drawable.GradientDrawable().apply {
                     shape = android.graphics.drawable.GradientDrawable.RECTANGLE
-                    cornerRadius = dpToPx(10).toFloat()
+                    cornerRadius = dpToPx(8).toFloat()
                     setColor(Color.parseColor("#F8FAFC"))
                     setStroke(dpToPx(1), Color.parseColor("#CBD5E1"))
                 }
@@ -1292,7 +1565,7 @@ class MainActivity : AppCompatActivity() {
 
             val tvRagHeader = android.widget.TextView(ctx).apply {
                 text = "🤖 AI Chef & Post-Harvest Advisor"
-                textSize = 10.5f
+                textSize = 10f
                 setTextColor(Color.parseColor("#15803D"))
                 setTypeface(null, android.graphics.Typeface.BOLD)
             }
@@ -1301,9 +1574,9 @@ class MainActivity : AppCompatActivity() {
             if (fr.storageGuideline.isNotEmpty()) {
                 val tvStorage = android.widget.TextView(ctx).apply {
                     text = "🧊 Storage: ${fr.storageGuideline}"
-                    textSize = 10f
+                    textSize = 9.5f
                     setTextColor(Color.parseColor("#334155"))
-                    setPadding(0, dpToPx(3), 0, dpToPx(2))
+                    setPadding(0, dpToPx(2), 0, dpToPx(1))
                 }
                 ragCard.addView(tvStorage)
             }
@@ -1312,10 +1585,10 @@ class MainActivity : AppCompatActivity() {
                 val tvRecipe = android.widget.TextView(ctx).apply {
                     val prep = if (fr.chefRecipePrepTime.isNotEmpty()) " (${fr.chefRecipePrepTime})" else ""
                     text = "🥗 Chef Recipe: ${fr.chefRecipeTitle}$prep\n${fr.chefRecipeInstructions}"
-                    textSize = 10f
+                    textSize = 9.5f
                     setTextColor(Color.parseColor("#1E293B"))
                     setTypeface(null, android.graphics.Typeface.ITALIC)
-                    setPadding(0, dpToPx(2), 0, dpToPx(2))
+                    setPadding(0, dpToPx(1), 0, dpToPx(1))
                 }
                 ragCard.addView(tvRecipe)
             }
@@ -1327,7 +1600,7 @@ class MainActivity : AppCompatActivity() {
         val divider = android.view.View(ctx).apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, dpToPx(1)
-            ).apply { topMargin = dpToPx(10); bottomMargin = dpToPx(2) }
+            ).apply { topMargin = dpToPx(6); bottomMargin = dpToPx(2) }
             setBackgroundColor(Color.parseColor("#F1F5F9"))
         }
         container.addView(divider)
@@ -1339,176 +1612,68 @@ class MainActivity : AppCompatActivity() {
     // Crop Growth Analysis UI Card Builder
     // ==========================================
 
-    private fun buildScannedCropGrowthCard(crop: CropCultivationProfile): View {
-        val ctx = this
-        val card = LinearLayout(ctx).apply {
-            orientation = LinearLayout.VERTICAL
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { topMargin = dpToPx(6); bottomMargin = dpToPx(6) }
-            setPadding(dpToPx(12), dpToPx(10), dpToPx(12), dpToPx(10))
-            background = android.graphics.drawable.GradientDrawable().apply {
-                shape = android.graphics.drawable.GradientDrawable.RECTANGLE
-                cornerRadius = dpToPx(12).toFloat()
-                setColor(Color.parseColor("#F0FDF4"))
-                setStroke(dpToPx(1), Color.parseColor("#86EFAC"))
-            }
-        }
-
-        // Header Row: Title & Total Days Badge
-        val headerRow = LinearLayout(ctx).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = android.view.Gravity.CENTER_VERTICAL
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
-            )
-        }
-
-        val tvTitle = TextView(ctx).apply {
-            text = "🌱 Crop Cultivation Timeline"
-            textSize = 11.5f
-            setTextColor(Color.parseColor("#166534"))
-            setTypeface(null, android.graphics.Typeface.BOLD)
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-        }
-
-        val tvBadge = TextView(ctx).apply {
-            text = "⏱️ ${crop.totalDurationRange}"
-            textSize = 10f
-            setTextColor(Color.parseColor("#15803D"))
-            setTypeface(null, android.graphics.Typeface.BOLD)
-            setPadding(dpToPx(8), dpToPx(3), dpToPx(8), dpToPx(3))
-            background = android.graphics.drawable.GradientDrawable().apply {
-                shape = android.graphics.drawable.GradientDrawable.RECTANGLE
-                cornerRadius = dpToPx(100).toFloat()
-                setColor(Color.parseColor("#DCFCE7"))
-                setStroke(dpToPx(1), Color.parseColor("#BBF7D0"))
-            }
-        }
-
-        headerRow.addView(tvTitle)
-        headerRow.addView(tvBadge)
-        card.addView(headerRow)
-
-        val tvSubtitle = TextView(ctx).apply {
-            text = "Average: ~${crop.averageDays} days from seed/planting to mature harvest (${crop.difficulty})"
-            textSize = 10f
-            setTextColor(Color.parseColor("#374151"))
-            setPadding(0, dpToPx(2), 0, dpToPx(6))
-        }
-        card.addView(tvSubtitle)
-
-        // Stage Pills Row
-        val stageRow = LinearLayout(ctx).apply {
-            orientation = LinearLayout.HORIZONTAL
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
-            )
-            setPadding(0, dpToPx(2), 0, dpToPx(6))
-        }
-
-        for (stg in crop.stages) {
-            val stageCol = LinearLayout(ctx).apply {
-                orientation = LinearLayout.VERTICAL
-                gravity = android.view.Gravity.CENTER
-                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-                setPadding(dpToPx(2), dpToPx(2), dpToPx(2), dpToPx(2))
-            }
-
-            val tvIcon = TextView(ctx).apply {
-                text = stg.iconEmoji
-                textSize = 12f
-                gravity = android.view.Gravity.CENTER
-            }
-            val tvName = TextView(ctx).apply {
-                val shortName = when {
-                    stg.name.contains("Germination", ignoreCase = true) || stg.name.contains("Sprout", ignoreCase = true) -> "Sprout"
-                    stg.name.contains("Vegetative", ignoreCase = true) || stg.name.contains("Foliage", ignoreCase = true) -> "Foliage"
-                    stg.name.contains("Flower", ignoreCase = true) || stg.name.contains("Blossom", ignoreCase = true) -> "Bloom"
-                    stg.name.contains("Bulking", ignoreCase = true) || stg.name.contains("Sizing", ignoreCase = true) || stg.name.contains("Fruit", ignoreCase = true) || stg.name.contains("Formation", ignoreCase = true) -> "Fruiting"
-                    else -> "Harvest"
-                }
-                text = shortName
-                textSize = 7.5f
-                setTextColor(Color.parseColor("#4B5563"))
-                setTypeface(null, android.graphics.Typeface.BOLD)
-                gravity = android.view.Gravity.CENTER
-            }
-            val tvDays = TextView(ctx).apply {
-                text = stg.durationDays.replace(" days", "d").replace(" months", "m")
-                textSize = 7f
-                setTextColor(Color.parseColor("#059669"))
-                gravity = android.view.Gravity.CENTER
-            }
-            stageCol.addView(tvIcon)
-            stageCol.addView(tvName)
-            stageCol.addView(tvDays)
-            stageRow.addView(stageCol)
-        }
-        card.addView(stageRow)
-
-        // Growing Conditions & Harvest Signs
-        val tvCond = TextView(ctx).apply {
-            text = "☀️ ${crop.sunlight}  •  🌡️ ${crop.temperature}\n💧 ${crop.waterNeeds}"
-            textSize = 9.5f
-            setTextColor(Color.parseColor("#1E293B"))
-            setPadding(0, dpToPx(2), 0, dpToPx(2))
-        }
-        card.addView(tvCond)
-
-        val tvHarvest = TextView(ctx).apply {
-            text = "🧺 Harvest Sign: ${crop.harvestSigns}"
-            textSize = 9.5f
-            setTextColor(Color.parseColor("#15803D"))
-            setTypeface(null, android.graphics.Typeface.ITALIC)
-            setPadding(0, dpToPx(2), 0, 0)
-        }
-        card.addView(tvHarvest)
-
-        return card
-    }
-
     private fun buildPlantGrowthCard(item: DetectedItem, est: PlantGrowthEstimate): View {
         val ctx = this
         val crop = est.profile
+        val isFruit = crop.category.equals("Fruit", ignoreCase = true)
+
         val card = LinearLayout(ctx).apply {
             orientation = LinearLayout.VERTICAL
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { topMargin = dpToPx(6); bottomMargin = dpToPx(6) }
-            setPadding(dpToPx(14), dpToPx(12), dpToPx(14), dpToPx(12))
+            ).apply { topMargin = dpToPx(2); bottomMargin = dpToPx(4) }
+            setPadding(dpToPx(10), dpToPx(8), dpToPx(10), dpToPx(10))
             background = android.graphics.drawable.GradientDrawable().apply {
                 shape = android.graphics.drawable.GradientDrawable.RECTANGLE
-                cornerRadius = dpToPx(14).toFloat()
+                cornerRadius = dpToPx(12).toFloat()
                 setColor(Color.parseColor("#F8FAFC"))
-                setStroke(dpToPx(1), Color.parseColor("#CBD5E1"))
+                setStroke(dpToPx(1), Color.parseColor("#E2E8F0"))
             }
         }
 
-        // Header Row: Emoji + Name + Category Badge + Stage Badge
+        // 1. Header Banner: Emoji + Name + Scientific + Category Badge + Difficulty Badge
         val headerRow = LinearLayout(ctx).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = android.view.Gravity.CENTER_VERTICAL
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
             )
+        }
+
+        val nameCol = LinearLayout(ctx).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
         }
 
         val tvTitle = TextView(ctx).apply {
             text = "${crop.emoji} ${crop.name} Plant"
-            textSize = 14f
+            textSize = 14.5f
             setTextColor(Color.parseColor("#0F172A"))
             setTypeface(null, android.graphics.Typeface.BOLD)
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
         }
 
-        val isFruit = crop.category.equals("Fruit", ignoreCase = true)
+        val tvSci = TextView(ctx).apply {
+            text = "${crop.scientificName} • ${crop.totalDurationRange}"
+            textSize = 9.5f
+            setTextColor(Color.parseColor("#64748B"))
+            setTypeface(null, android.graphics.Typeface.ITALIC)
+        }
+
+        nameCol.addView(tvTitle)
+        nameCol.addView(tvSci)
+        headerRow.addView(nameCol)
+
+        val badgeCol = LinearLayout(ctx).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER_VERTICAL
+        }
+
         val tvCategoryBadge = TextView(ctx).apply {
             text = crop.category.uppercase()
-            textSize = 9.5f
+            textSize = 8.5f
             setTextColor(Color.parseColor(if (isFruit) "#C2410C" else "#15803D"))
             setTypeface(null, android.graphics.Typeface.BOLD)
-            setPadding(dpToPx(8), dpToPx(3), dpToPx(8), dpToPx(3))
+            setPadding(dpToPx(6), dpToPx(2), dpToPx(6), dpToPx(2))
             background = android.graphics.drawable.GradientDrawable().apply {
                 shape = android.graphics.drawable.GradientDrawable.RECTANGLE
                 cornerRadius = dpToPx(100).toFloat()
@@ -1517,132 +1682,220 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        val tvBadge = TextView(ctx).apply {
-            text = "Stage ${est.currentStage.stageNumber}/5"
-            textSize = 9.5f
-            setTextColor(Color.parseColor("#15803D"))
+        val tvDiffBadge = TextView(ctx).apply {
+            text = crop.difficulty
+            textSize = 8.5f
+            setTextColor(Color.parseColor("#475569"))
             setTypeface(null, android.graphics.Typeface.BOLD)
-            setPadding(dpToPx(8), dpToPx(3), dpToPx(8), dpToPx(3))
+            setPadding(dpToPx(6), dpToPx(2), dpToPx(6), dpToPx(2))
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { marginStart = dpToPx(6) }
+            ).apply { marginStart = dpToPx(4) }
             background = android.graphics.drawable.GradientDrawable().apply {
                 shape = android.graphics.drawable.GradientDrawable.RECTANGLE
                 cornerRadius = dpToPx(100).toFloat()
-                setColor(Color.parseColor("#DCFCE7"))
-                setStroke(dpToPx(1), Color.parseColor("#86EFAC"))
+                setColor(Color.parseColor("#F1F5F9"))
+                setStroke(dpToPx(1), Color.parseColor("#CBD5E1"))
             }
         }
 
-        headerRow.addView(tvTitle)
-        headerRow.addView(tvCategoryBadge)
-        headerRow.addView(tvBadge)
+        badgeCol.addView(tvCategoryBadge)
+        badgeCol.addView(tvDiffBadge)
+        headerRow.addView(badgeCol)
         card.addView(headerRow)
 
-        val tvSci = TextView(ctx).apply {
-            text = "${crop.scientificName} • Difficulty: ${crop.difficulty}"
-            textSize = 10f
-            setTextColor(Color.parseColor("#64748B"))
-            setTypeface(null, android.graphics.Typeface.ITALIC)
-            setPadding(0, dpToPx(2), 0, dpToPx(4))
+        // 2. Real-Time Vision Biometrics 3-Tile Row
+        val bioRow = LinearLayout(ctx).apply {
+            orientation = LinearLayout.HORIZONTAL
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { topMargin = dpToPx(5); bottomMargin = dpToPx(2) }
         }
-        card.addView(tvSci)
 
-        // Growing Time Highlight Box
-        val timeBox = LinearLayout(ctx).apply {
+        fun addBioCard(container: LinearLayout, label: String, value: String, sub: String, colorHex: String) {
+            val tile = LinearLayout(ctx).apply {
+                orientation = LinearLayout.VERTICAL
+                gravity = android.view.Gravity.CENTER
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
+                    setMargins(dpToPx(1), 0, dpToPx(1), 0)
+                }
+                setPadding(dpToPx(4), dpToPx(4), dpToPx(4), dpToPx(4))
+                background = android.graphics.drawable.GradientDrawable().apply {
+                    shape = android.graphics.drawable.GradientDrawable.RECTANGLE
+                    cornerRadius = dpToPx(6).toFloat()
+                    setColor(Color.parseColor("#FFFFFF"))
+                    setStroke(dpToPx(1), Color.parseColor("#E2E8F0"))
+                }
+            }
+            val tvL = TextView(ctx).apply {
+                text = label
+                textSize = 7f
+                setTextColor(Color.parseColor("#64748B"))
+                setTypeface(null, android.graphics.Typeface.BOLD)
+            }
+            val tvV = TextView(ctx).apply {
+                text = value
+                textSize = 10f
+                setTextColor(Color.parseColor(colorHex))
+                setTypeface(null, android.graphics.Typeface.BOLD)
+            }
+            val tvS = TextView(ctx).apply {
+                text = sub
+                textSize = 6.5f
+                setTextColor(Color.parseColor("#94A3B8"))
+            }
+            tile.addView(tvL)
+            tile.addView(tvV)
+            tile.addView(tvS)
+            container.addView(tile)
+        }
+
+        val variStr = "VARI +${String.format(java.util.Locale.US, "%.2f", est.vegetationIndexVARI)}"
+        addBioCard(bioRow, "🌿 CANOPY VIGOUR", variStr, "${String.format(java.util.Locale.US, "%.1f", est.canopyCoveragePct)}% Coverage", "#15803D")
+        addBioCard(bioRow, "📊 MATURITY BRIX", "${est.maturityIndexPct}%", est.currentStage.name, "#0284C7")
+        addBioCard(bioRow, "🌡️ THERMAL GDD", "${est.accumulatedGDD} GDD", "Target ${est.targetGDD}", "#D97706")
+        card.addView(bioRow)
+
+        // 3. Hero Harvest Countdown Banner (High contrast emerald card)
+        val harvestHeroBox = LinearLayout(ctx).apply {
             orientation = LinearLayout.VERTICAL
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
             ).apply { topMargin = dpToPx(4); bottomMargin = dpToPx(6) }
-            setPadding(dpToPx(10), dpToPx(6), dpToPx(10), dpToPx(6))
+            setPadding(dpToPx(10), dpToPx(8), dpToPx(10), dpToPx(8))
             background = android.graphics.drawable.GradientDrawable().apply {
                 shape = android.graphics.drawable.GradientDrawable.RECTANGLE
                 cornerRadius = dpToPx(8).toFloat()
                 setColor(Color.parseColor("#F0FDF4"))
-                setStroke(dpToPx(1), Color.parseColor("#BBF7D0"))
+                setStroke(dpToPx(1.5f), Color.parseColor("#86EFAC"))
             }
         }
 
-        val tvTimeHeader = TextView(ctx).apply {
-            text = "⏱️ Total Growing Time: ${crop.totalDurationRange} (~${crop.averageDays} days from seed)"
-            textSize = 12f
-            setTextColor(Color.parseColor("#166534"))
-            setTypeface(null, android.graphics.Typeface.BOLD)
+        val heroTopRow = LinearLayout(ctx).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER_VERTICAL
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
+            )
         }
-        val tvTimeProgress = TextView(ctx).apply {
-            val remainText = if (est.remainingDaysToHarvest > 0) "~${est.remainingDaysToHarvest} days remaining until ripe harvest" else "Ready for Harvest!"
-            text = "🌱 Growth State: ${est.currentStage.name} (~${est.estimatedDaysElapsed}d elapsed • $remainText)"
-            textSize = 10.5f
+
+        val tvHeroCountdown = TextView(ctx).apply {
+            text = if (est.remainingDaysToHarvest <= 0) "🧺 HARVEST READY NOW!" else "🧺 Ready in ~${est.remainingDaysToHarvest} Days"
+            textSize = 12.5f
             setTextColor(Color.parseColor("#15803D"))
             setTypeface(null, android.graphics.Typeface.BOLD)
-            setPadding(0, dpToPx(3), 0, 0)
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
         }
-        timeBox.addView(tvTimeHeader)
-        timeBox.addView(tvTimeProgress)
-        card.addView(timeBox)
 
-        // Progress bar for stage progress
-        val progressBar = ProgressBar(ctx, null, android.R.attr.progressBarStyleHorizontal).apply {
+        val tvHeroProgressBadge = TextView(ctx).apply {
+            text = "${est.progressPercent}% Matured"
+            textSize = 9f
+            setTextColor(Color.parseColor("#166534"))
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            setPadding(dpToPx(6), dpToPx(2), dpToPx(6), dpToPx(2))
+            background = android.graphics.drawable.GradientDrawable().apply {
+                shape = android.graphics.drawable.GradientDrawable.RECTANGLE
+                cornerRadius = dpToPx(100).toFloat()
+                setColor(Color.parseColor("#DCFCE7"))
+            }
+        }
+
+        heroTopRow.addView(tvHeroCountdown)
+        heroTopRow.addView(tvHeroProgressBadge)
+        harvestHeroBox.addView(heroTopRow)
+
+        // Progress bar inside Hero Box
+        val heroProgressBar = ProgressBar(ctx, null, android.R.attr.progressBarStyleHorizontal).apply {
             max = 100
             progress = est.progressPercent
             layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, dpToPx(8)
-            ).apply { bottomMargin = dpToPx(6) }
+                LinearLayout.LayoutParams.MATCH_PARENT, dpToPx(6)
+            ).apply { topMargin = dpToPx(4); bottomMargin = dpToPx(4) }
             android.graphics.PorterDuffColorFilter(
                 Color.parseColor("#16A34A"), android.graphics.PorterDuff.Mode.SRC_IN
             ).also { filter -> progressDrawable.colorFilter = filter }
         }
-        card.addView(progressBar)
+        harvestHeroBox.addView(heroProgressBar)
 
-        val tvSummary = TextView(ctx).apply {
-            text = est.detectionSummary
-            textSize = 10f
-            setTextColor(Color.parseColor("#374151"))
-            setPadding(0, 0, 0, dpToPx(6))
-        }
-        card.addView(tvSummary)
-
-        // Growth Stages Timeline Title
-        val tvTimelineTitle = TextView(ctx).apply {
-            text = "🌿 5 Developmental Growth Stages:"
-            textSize = 10.5f
-            setTextColor(Color.parseColor("#1E293B"))
+        val tvCalendarWindow = TextView(ctx).apply {
+            text = "📅 Estimated Harvest Window: ${est.harvestCalendarWindow}"
+            textSize = 9.5f
+            setTextColor(Color.parseColor("#15803D"))
             setTypeface(null, android.graphics.Typeface.BOLD)
-            setPadding(0, dpToPx(2), 0, dpToPx(4))
         }
-        card.addView(tvTimelineTitle)
+        harvestHeroBox.addView(tvCalendarWindow)
 
-        // Stage Pills Row
+        val tvHeroSummary = TextView(ctx).apply {
+            text = "${est.detectionSummary}\n🌱 ${est.chlorophyllIndex}"
+            textSize = 9f
+            setTextColor(Color.parseColor("#374151"))
+            setPadding(0, dpToPx(2), 0, 0)
+        }
+        harvestHeroBox.addView(tvHeroSummary)
+        card.addView(harvestHeroBox)
+
+        // 4. 5-Stage Developmental Growth Steps Visualizer
+        val tvStagesHeader = TextView(ctx).apply {
+            text = "🌿 5 Developmental Lifecycle Stages:"
+            textSize = 10f
+            setTextColor(Color.parseColor("#0F172A"))
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            setPadding(0, dpToPx(2), 0, dpToPx(3))
+        }
+        card.addView(tvStagesHeader)
+
         val stageRow = LinearLayout(ctx).apply {
             orientation = LinearLayout.HORIZONTAL
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
             )
-            setPadding(0, dpToPx(2), 0, dpToPx(6))
+            setPadding(0, 0, 0, dpToPx(4))
         }
 
         for ((idx, stg) in crop.stages.withIndex()) {
             val isCurrent = (idx == est.currentStageIndex)
+            val isPast = (idx < est.currentStageIndex)
+
             val stageCol = LinearLayout(ctx).apply {
                 orientation = LinearLayout.VERTICAL
                 gravity = android.view.Gravity.CENTER
-                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-                setPadding(dpToPx(2), dpToPx(4), dpToPx(2), dpToPx(4))
-                if (isCurrent) {
-                    background = android.graphics.drawable.GradientDrawable().apply {
-                        shape = android.graphics.drawable.GradientDrawable.RECTANGLE
-                        cornerRadius = dpToPx(6).toFloat()
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
+                    setMargins(dpToPx(1), 0, dpToPx(1), 0)
+                }
+                setPadding(dpToPx(2), dpToPx(3), dpToPx(2), dpToPx(3))
+                background = android.graphics.drawable.GradientDrawable().apply {
+                    shape = android.graphics.drawable.GradientDrawable.RECTANGLE
+                    cornerRadius = dpToPx(6).toFloat()
+                    if (isCurrent) {
                         setColor(Color.parseColor("#DCFCE7"))
-                        setStroke(dpToPx(1), Color.parseColor("#86EFAC"))
+                        setStroke(dpToPx(1), Color.parseColor("#16A34A"))
+                    } else if (isPast) {
+                        setColor(Color.parseColor("#F0FDF4"))
+                        setStroke(dpToPx(1), Color.parseColor("#BBF7D0"))
+                    } else {
+                        setColor(Color.parseColor("#FFFFFF"))
+                        setStroke(dpToPx(1), Color.parseColor("#E2E8F0"))
                     }
                 }
             }
 
+            val tvStatusTag = TextView(ctx).apply {
+                text = when {
+                    isCurrent -> "🎯 Active"
+                    isPast -> "✅ Done"
+                    else -> "⚪ ${idx + 1}"
+                }
+                textSize = 6.5f
+                setTextColor(Color.parseColor(if (isCurrent) "#15803D" else if (isPast) "#16A34A" else "#94A3B8"))
+                setTypeface(null, if (isCurrent) android.graphics.Typeface.BOLD else android.graphics.Typeface.NORMAL)
+            }
+
             val tvIcon = TextView(ctx).apply {
                 text = stg.iconEmoji
-                textSize = 13f
+                textSize = 12f
                 gravity = android.view.Gravity.CENTER
             }
+
             val tvName = TextView(ctx).apply {
                 val shortName = when {
                     stg.name.contains("Germination", ignoreCase = true) || stg.name.contains("Sprout", ignoreCase = true) -> "Sprout"
@@ -1652,17 +1905,20 @@ class MainActivity : AppCompatActivity() {
                     else -> "Harvest"
                 }
                 text = shortName
-                textSize = 8f
+                textSize = 7.5f
                 setTextColor(if (isCurrent) Color.parseColor("#15803D") else Color.parseColor("#4B5563"))
                 setTypeface(null, if (isCurrent) android.graphics.Typeface.BOLD else android.graphics.Typeface.NORMAL)
                 gravity = android.view.Gravity.CENTER
             }
+
             val tvDays = TextView(ctx).apply {
                 text = stg.durationDays.replace(" days", "d").replace(" months", "m")
-                textSize = 7.5f
-                setTextColor(Color.parseColor("#059669"))
+                textSize = 7f
+                setTextColor(Color.parseColor(if (isCurrent) "#15803D" else "#059669"))
                 gravity = android.view.Gravity.CENTER
             }
+
+            stageCol.addView(tvStatusTag)
             stageCol.addView(tvIcon)
             stageCol.addView(tvName)
             stageCol.addView(tvDays)
@@ -1670,50 +1926,187 @@ class MainActivity : AppCompatActivity() {
         }
         card.addView(stageRow)
 
-        // Growing Conditions & Harvest Signs
-        val condBox = LinearLayout(ctx).apply {
+        // 5. Cultivation Vitals 2x2 Grid (Modern Light Instrument Panel)
+        val vitalsCard = LinearLayout(ctx).apply {
             orientation = LinearLayout.VERTICAL
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { topMargin = dpToPx(4) }
+            ).apply { topMargin = dpToPx(3); bottomMargin = dpToPx(4) }
             setPadding(dpToPx(8), dpToPx(6), dpToPx(8), dpToPx(6))
             background = android.graphics.drawable.GradientDrawable().apply {
                 shape = android.graphics.drawable.GradientDrawable.RECTANGLE
-                cornerRadius = dpToPx(6).toFloat()
-                setColor(Color.parseColor("#F1F5F9"))
+                cornerRadius = dpToPx(8).toFloat()
+                setColor(Color.parseColor("#F8FAFC"))
+                setStroke(dpToPx(1), Color.parseColor("#E2E8F0"))
             }
         }
 
-        val tvCond = TextView(ctx).apply {
-            text = "☀️ ${crop.sunlight}  •  🌡️ ${crop.temperature}\n💧 ${crop.waterNeeds}  •  🌱 Soil: ${crop.soilAndPh}"
+        val tvVitalsTitle = TextView(ctx).apply {
+            text = "📊 Ideal Growing Environment & Vitals"
             textSize = 9.5f
-            setTextColor(Color.parseColor("#334155"))
-            setPadding(0, 0, 0, dpToPx(2))
+            setTextColor(Color.parseColor("#0284C7"))
+            setTypeface(null, android.graphics.Typeface.BOLD)
         }
-        condBox.addView(tvCond)
+        vitalsCard.addView(tvVitalsTitle)
+
+        val vitalsGrid = LinearLayout(ctx).apply {
+            orientation = LinearLayout.HORIZONTAL
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { topMargin = dpToPx(3) }
+        }
+
+        fun addVitalTile(container: LinearLayout, label: String, value: String, icon: String) {
+            val col = LinearLayout(ctx).apply {
+                orientation = LinearLayout.VERTICAL
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                setPadding(dpToPx(2), dpToPx(1), dpToPx(2), dpToPx(1))
+            }
+            val tvL = TextView(ctx).apply {
+                text = "$icon $label"
+                textSize = 7.5f
+                setTextColor(Color.parseColor("#64748B"))
+                setTypeface(null, android.graphics.Typeface.BOLD)
+            }
+            val tvV = TextView(ctx).apply {
+                text = value
+                textSize = 8.5f
+                setTextColor(Color.parseColor("#0F172A"))
+                setLineSpacing(0f, 0.95f)
+            }
+            col.addView(tvL)
+            col.addView(tvV)
+            container.addView(col)
+        }
+
+        addVitalTile(vitalsGrid, "SUNLIGHT", if (crop.sunlight.length > 25) crop.sunlight.take(23) + "..." else crop.sunlight, "☀️")
+        addVitalTile(vitalsGrid, "TEMP", if (crop.temperature.length > 25) crop.temperature.take(23) + "..." else crop.temperature, "🌡️")
+        addVitalTile(vitalsGrid, "WATER", if (crop.waterNeeds.length > 25) crop.waterNeeds.take(23) + "..." else crop.waterNeeds, "💧")
+        addVitalTile(vitalsGrid, "SOIL/pH", if (crop.soilAndPh.length > 25) crop.soilAndPh.take(23) + "..." else crop.soilAndPh, "🌱")
+
+        vitalsCard.addView(vitalsGrid)
+        card.addView(vitalsCard)
+
+        // 6. Actionable Harvest Guide & Agronomist Care Card
+        val agronomyCard = LinearLayout(ctx).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { topMargin = dpToPx(2); bottomMargin = dpToPx(4) }
+            setPadding(dpToPx(8), dpToPx(6), dpToPx(8), dpToPx(6))
+            background = android.graphics.drawable.GradientDrawable().apply {
+                shape = android.graphics.drawable.GradientDrawable.RECTANGLE
+                cornerRadius = dpToPx(8).toFloat()
+                setColor(Color.parseColor("#FFFFFF"))
+                setStroke(dpToPx(1), Color.parseColor("#CBD5E1"))
+            }
+        }
+
+        val tvAgroHeader = TextView(ctx).apply {
+            text = "👨‍🌾 AI Agronomist Field Prescription"
+            textSize = 10f
+            setTextColor(Color.parseColor("#15803D"))
+            setTypeface(null, android.graphics.Typeface.BOLD)
+        }
+        agronomyCard.addView(tvAgroHeader)
+
+        val tvFeed = TextView(ctx).apply {
+            text = "🧪 Feeding: ${crop.npkRatio}"
+            textSize = 9f
+            setTextColor(Color.parseColor("#0369A1"))
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            setPadding(0, dpToPx(2), 0, dpToPx(1))
+        }
+        agronomyCard.addView(tvFeed)
+
+        val tvRx = TextView(ctx).apply {
+            text = "🌿 Prescription: ${est.agronomicPrescription}"
+            textSize = 9f
+            setTextColor(Color.parseColor("#1E293B"))
+            setPadding(0, 0, 0, dpToPx(1))
+        }
+        agronomyCard.addView(tvRx)
 
         val tvHarvest = TextView(ctx).apply {
-            text = "🧺 Harvest Sign: ${crop.harvestSigns}"
-            textSize = 9.5f
-            setTextColor(Color.parseColor("#15803D"))
-            setTypeface(null, android.graphics.Typeface.ITALIC)
+            text = "🧺 When to Pick: ${crop.harvestSigns}"
+            textSize = 9f
+            setTextColor(Color.parseColor("#334155"))
+            setPadding(0, 0, 0, dpToPx(1))
         }
-        condBox.addView(tvHarvest)
+        agronomyCard.addView(tvHarvest)
 
-        val tvCare = TextView(ctx).apply {
-            text = "💡 Care Tip: ${crop.careTips}"
-            textSize = 9.5f
+        val tvTiming = TextView(ctx).apply {
+            text = "⏰ Optimal Time: ${crop.optimalPickingWindow} • 🛡️ Disease Watch: ${crop.diseaseWatch}"
+            textSize = 8.5f
             setTextColor(Color.parseColor("#475569"))
-            setPadding(0, dpToPx(2), 0, 0)
+            setPadding(0, dpToPx(1), 0, 0)
         }
-        condBox.addView(tvCare)
+        agronomyCard.addView(tvTiming)
+        card.addView(agronomyCard)
 
-        card.addView(condBox)
+        // 7. Interactive Quick Agronomy Actions Bar
+        val actionsRow = LinearLayout(ctx).apply {
+            orientation = LinearLayout.HORIZONTAL
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { topMargin = dpToPx(2) }
+        }
+
+        fun addActionBtn(title: String, colorHex: String, onClick: () -> Unit) {
+            val btn = MaterialButton(ctx, null, com.google.android.material.R.attr.materialButtonOutlinedStyle).apply {
+                text = title
+                textSize = 9f
+                setTextColor(Color.parseColor(colorHex))
+                strokeColor = android.content.res.ColorStateList.valueOf(Color.parseColor(colorHex))
+                strokeWidth = dpToPx(1)
+                cornerRadius = dpToPx(6)
+                insetTop = 0
+                insetBottom = 0
+                layoutParams = LinearLayout.LayoutParams(0, dpToPx(34), 1f).apply {
+                    setMargins(dpToPx(2), 0, dpToPx(2), 0)
+                }
+                setPadding(dpToPx(2), 0, dpToPx(2), 0)
+                setOnClickListener { onClick() }
+            }
+            actionsRow.addView(btn)
+        }
+
+        addActionBtn("📅 Calendar", "#15803D") {
+            AlertDialog.Builder(ctx)
+                .setTitle("📅 ${crop.name} Harvest Calendar")
+                .setMessage("🎯 Target Window: ${est.harvestCalendarWindow}\n\n⏱️ Days Remaining: ~${est.remainingDaysToHarvest} days\n🌱 Current Phase: ${est.currentStage.name}\n🌿 Total Duration: ${crop.totalDurationRange}\n\n🔔 Add to your device calendar to receive peak harvest alerts.")
+                .setPositiveButton("Set Reminder") { _, _ ->
+                    Toast.makeText(ctx, "✅ Harvest reminder logged for ${est.harvestCalendarWindow}", Toast.LENGTH_SHORT).show()
+                }
+                .setNegativeButton("Close", null)
+                .show()
+        }
+
+        addActionBtn("💧 Nutrition", "#0284C7") {
+            AlertDialog.Builder(ctx)
+                .setTitle("🧪 ${crop.name} Agronomy Nutrition")
+                .setMessage("💧 Water Strategy: ${crop.waterNeeds}\n\n🧪 NPK Formula: ${crop.npkRatio}\n\n💡 Care Guide: ${crop.careTips}\n\n🛡️ Disease Watch: ${crop.diseaseWatch}")
+                .setPositiveButton("Got It", null)
+                .show()
+        }
+
+        addActionBtn("🔬 Biometrics", "#7C3AED") {
+            AlertDialog.Builder(ctx)
+                .setTitle("🔬 Computer Vision Biometrics")
+                .setMessage("🌿 Vegetation Index (VARI): +${String.format(java.util.Locale.US, "%.2f", est.vegetationIndexVARI)}\n🌱 Canopy Biomass Coverage: ${String.format(java.util.Locale.US, "%.1f", est.canopyCoveragePct)}%\n📊 Maturity / Brix Index: ${est.maturityIndexPct}%\n🌡️ Thermal GDD: ${est.accumulatedGDD} / ${est.targetGDD}\n🧬 Chlorophyll Rating: ${est.chlorophyllIndex}\n🎯 AI Classification Confidence: ${(est.confidence * 100).toInt()}%")
+                .setPositiveButton("Done", null)
+                .show()
+        }
+
+        card.addView(actionsRow)
 
         return card
     }
 
     private fun dpToPx(dp: Int): Int =
+        (dp * resources.displayMetrics.density + 0.5f).toInt()
+
+    private fun dpToPx(dp: Float): Int =
         (dp * resources.displayMetrics.density + 0.5f).toInt()
 
     // ==========================================
@@ -1806,82 +2199,208 @@ class MainActivity : AppCompatActivity() {
     // Web Dashboard Management
     // ==========================================
 
-    @SuppressLint("SetJavaScriptEnabled")
-    private fun setupWebView() {
-        val settings = webView.settings
-        settings.javaScriptEnabled = true
-        settings.domStorageEnabled = true
-        settings.allowFileAccess = true
-        settings.allowContentAccess = true
-        settings.loadWithOverviewMode = true
-        settings.useWideViewPort = true
-        settings.mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
-        settings.cacheMode = WebSettings.LOAD_DEFAULT
+    // ==========================================
+    // Advanced Feature Dialogs & Utilities
+    // ==========================================
 
-        webView.webViewClient = object : WebViewClient() {
-            override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
-                super.onPageStarted(view, url, favicon)
-                progressBar.visibility = View.VISIBLE
-                errorView.visibility = View.GONE
-                webView.visibility = View.VISIBLE
+    private fun showCropLibraryDialog() {
+        val cropNames = CropGrowthRepository.CROPS.map { "${it.emoji} ${it.name} (${it.category})" }.toTypedArray()
+        AlertDialog.Builder(this)
+            .setTitle("📚 Crop Cultivation Library")
+            .setItems(cropNames) { _, which ->
+                val selected = CropGrowthRepository.CROPS[which]
+                showCropDetailDialog(selected)
             }
-
-            override fun onPageFinished(view: WebView?, url: String?) {
-                super.onPageFinished(view, url)
-                progressBar.visibility = View.GONE
-            }
-
-            override fun onReceivedError(
-                view: WebView?,
-                request: WebResourceRequest?,
-                error: WebResourceError?
-            ) {
-                if (request?.isForMainFrame == true) {
-                    progressBar.visibility = View.GONE
-                    webView.visibility = View.GONE
-                    errorView.visibility = View.VISIBLE
-                }
-            }
-        }
-
-        webView.webChromeClient = object : WebChromeClient() {
-            override fun onShowFileChooser(
-                webView: WebView?,
-                filePathCallback: ValueCallback<Array<Uri>>?,
-                fileChooserParams: FileChooserParams?
-            ): Boolean {
-                fileChooserCallback?.onReceiveValue(null)
-                fileChooserCallback = filePathCallback
-
-                val intent = fileChooserParams?.createIntent() ?: Intent(Intent.ACTION_GET_CONTENT).apply {
-                    type = "image/*"
-                }
-                try {
-                    filePickerLauncher.launch(intent)
-                } catch (e: Exception) {
-                    fileChooserCallback = null
-                    return false
-                }
-                return true
-            }
-        }
+            .setNegativeButton("Close", null)
+            .show()
     }
 
-    private fun loadFreshAiWeb() {
-        progressBar.visibility = View.VISIBLE
-        errorView.visibility = View.GONE
-        webView.visibility = View.VISIBLE
-        tvServerStatus.text = webUrl
-        webView.loadUrl(webUrl)
+    private fun showCropDetailDialog(crop: CropCultivationProfile) {
+        val stagesSummary = crop.stages.joinToString("\n") {
+            "  ${it.iconEmoji} Stage ${it.stageNumber}: ${it.name} (${it.durationDays}) - ${it.progressPct}%"
+        }
+        val detailMsg = """
+            🌱 Scientific Name: ${crop.scientificName}
+            📊 Category: ${crop.category} • Difficulty: ${crop.difficulty}
+            ⏳ Total Growth Cycle: ${crop.totalDurationRange} (~${crop.averageDays} days)
+            
+            ☀️ Sunlight: ${crop.sunlight}
+            🌡️ Temperature: ${crop.temperature}
+            💧 Watering: ${crop.waterNeeds}
+            🌱 Soil & pH: ${crop.soilAndPh}
+            🧪 Fertilizer Formula: ${crop.npkRatio}
+            ⏰ Best Picking Window: ${crop.optimalPickingWindow}
+            🛡️ Common Diseases: ${crop.diseaseWatch}
+            
+            📈 Phenological Stages:
+            $stagesSummary
+            
+            💡 Expert Care Tips:
+            ${crop.careTips}
+        """.trimIndent()
+
+        AlertDialog.Builder(this)
+            .setTitle("${crop.emoji} ${crop.name} Cultivation Guide")
+            .setMessage(detailMsg)
+            .setPositiveButton("Select This Crop") { _, _ ->
+                selectedCropName = crop.name
+                if (!isCropGrowthMode) {
+                    tabLayout.getTabAt(1)?.select()
+                } else {
+                    updateFreshnessUI(lastDetectedItems, lastEstimates)
+                }
+                Toast.makeText(this, "🌱 Active crop set to ${crop.name}", Toast.LENGTH_SHORT).show()
+            }
+            .setNegativeButton("Close", null)
+            .show()
     }
 
-    @Deprecated("Deprecated in Java")
-    override fun onBackPressed() {
-        if (webViewContainer.visibility == View.VISIBLE && webView.canGoBack()) {
-            webView.goBack()
+    private fun showPlantDoctorDialog() {
+        val crop = CropGrowthRepository.getProfile(selectedCropName ?: "Tomato") ?: CropGrowthRepository.CROPS.first()
+        val doctorMsg = """
+            🩺 Plant Pathology & Foliage Scouting
+            Active Profile: ${crop.emoji} ${crop.name}
+            
+            🛡️ High-Risk Pathogens & Pests:
+            ${crop.diseaseWatch}
+            
+            🧪 Recommended Action Protocol:
+            • Foliage Health: Inspect leaf undersides for fungal mycelium or sap-sucking pests.
+            • Chlorophyll Stress: If yellowing (chlorosis) occurs, supplement with magnesium or chelated iron.
+            • Humidity & Airflow: Prune lower yellowing canopy foliage to reduce fungal spore dampness.
+            • NPK Feeding Schedule: ${crop.npkRatio}
+            
+            💧 Irrigation Check: ${crop.waterNeeds}
+        """.trimIndent()
+
+        AlertDialog.Builder(this)
+            .setTitle("🩺 AI Plant Doctor & Agronomist")
+            .setMessage(doctorMsg)
+            .setPositiveButton("Take Foliage Photo") { _, _ ->
+                checkAndLaunchCamera()
+            }
+            .setNegativeButton("Close", null)
+            .show()
+    }
+
+    private fun showHarvestTimelineDialog() {
+        val crop = CropGrowthRepository.getProfile(selectedCropName ?: "Tomato") ?: CropGrowthRepository.CROPS.first()
+        val timelineMsg = """
+            🗓️ Harvest Countdown & Growing Timeline
+            Crop: ${crop.emoji} ${crop.name} (${crop.totalDurationRange})
+            
+            🌱 Lifecycle Milestones:
+            ${crop.stages.joinToString("\n") { "• ${it.iconEmoji} ${it.name}: ${it.durationDays} (${it.progressPct}% complete)" }}
+            
+            🧺 Peak Harvest Indicators:
+            ${crop.harvestSigns}
+            
+            ⏰ Optimal Picking Time:
+            ${crop.optimalPickingWindow}
+        """.trimIndent()
+
+        AlertDialog.Builder(this)
+            .setTitle("🗓️ ${crop.name} Growth Timeline")
+            .setMessage(timelineMsg)
+            .setPositiveButton("Set Harvest Calendar") { _, _ ->
+                Toast.makeText(this, "📅 Harvest timeline synced to ${crop.name}", Toast.LENGTH_SHORT).show()
+            }
+            .setNegativeButton("Done", null)
+            .show()
+    }
+
+    private fun shareInspectionReport() {
+        val isPlantMode = isCropGrowthMode
+        val title = if (isPlantMode) "🌱 FreshAI Plant Growth Report" else "🍎 FreshAI Produce Quality & Freshness Report"
+        val activeCrop = selectedCropName ?: lastDetectedItems.firstOrNull()?.className ?: "Tomato"
+        val p = CropGrowthRepository.getProfile(activeCrop) ?: CropGrowthRepository.CROPS.first()
+
+        val textReport = if (isPlantMode) {
+            """
+                $title
+                ==============================
+                Crop: ${p.emoji} ${p.name} (${p.scientificName})
+                Category: ${p.category} | Average Lifecycle: ${p.averageDays} days
+                Current Focus: ${p.totalDurationRange}
+                
+                ☀️ Sunlight Needs: ${p.sunlight}
+                🌡️ Ideal Temp: ${p.temperature}
+                💧 Water Schedule: ${p.waterNeeds}
+                🧪 Nutrient Formulation: ${p.npkRatio}
+                🧺 Harvest Readiness: ${p.harvestSigns}
+                
+                Generated by FreshAI Precision Agronomy Suite
+            """.trimIndent()
         } else {
-            super.onBackPressed()
+            val totalDetected = lastDetectedItems.size
+            val itemsSummary = lastDetectedItems.joinToString("\n") { "• ${it.className} (${(it.confidence * 100).toInt()}% confidence)" }
+            """
+                $title
+                ==============================
+                Scanned Items Count: $totalDetected
+                Detected Produce:
+                $itemsSummary
+                
+                Generated by FreshAI Quality & Shelf-Life Suite
+            """.trimIndent()
         }
+
+        val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(android.content.Intent.EXTRA_SUBJECT, title)
+            putExtra(android.content.Intent.EXTRA_TEXT, textReport)
+        }
+        startActivity(android.content.Intent.createChooser(shareIntent, "Share FreshAI Inspection Report"))
+    }
+
+    private val sensorListener = object : android.hardware.SensorEventListener {
+        override fun onSensorChanged(event: android.hardware.SensorEvent?) {
+            if (event == null) return
+            when (event.sensor.type) {
+                android.hardware.Sensor.TYPE_LIGHT -> {
+                    val lux = event.values[0]
+                    currentLuxValue = lux
+                    val luxStatus = when {
+                        lux < 100f -> "Low Light (Use Flash)"
+                        lux in 100f..1000f -> "Optimal Daylight"
+                        else -> "Bright Direct Sun"
+                    }
+                    tvSensorLux.text = "☀️ ${lux.toInt()} Lux ($luxStatus)"
+                }
+                android.hardware.Sensor.TYPE_ACCELEROMETER -> {
+                    val ax = event.values[0]
+                    val ay = event.values[1]
+                    val az = event.values[2]
+                    val gMagnitude = Math.sqrt((ax * ax + ay * ay + az * az).toDouble())
+                    val isSteady = Math.abs(gMagnitude - 9.81) < 1.2
+                    isDeviceStable = isSteady
+                    if (isSteady) {
+                        tvSensorStability.text = "🎯 Lens: Stable"
+                        tvSensorStability.setTextColor(Color.parseColor("#4ADE80"))
+                    } else {
+                        tvSensorStability.text = "⚠️ Lens: Shaky"
+                        tvSensorStability.setTextColor(Color.parseColor("#F87171"))
+                    }
+                }
+            }
+        }
+
+        override fun onAccuracyChanged(sensor: android.hardware.Sensor?, accuracy: Int) {}
+    }
+
+    override fun onResume() {
+        super.onResume()
+        try {
+            lightSensor?.let { sensorManager?.registerListener(sensorListener, it, android.hardware.SensorManager.SENSOR_DELAY_UI) }
+            accelSensor?.let { sensorManager?.registerListener(sensorListener, it, android.hardware.SensorManager.SENSOR_DELAY_UI) }
+        } catch (e: Exception) {}
+    }
+
+    override fun onPause() {
+        super.onPause()
+        try {
+            sensorManager?.unregisterListener(sensorListener)
+        } catch (e: Exception) {}
     }
 
     override fun onDestroy() {

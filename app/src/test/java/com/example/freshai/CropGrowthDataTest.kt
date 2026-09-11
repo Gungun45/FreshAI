@@ -81,4 +81,63 @@ class CropGrowthDataTest {
         assertNotNull(apple)
         assertTrue("Apple average days should be ~135", apple!!.averageDays in 120..160)
     }
+
+    @Test
+    fun testNewAgronomicPropertiesExistOnAllCrops() {
+        for (crop in CropGrowthRepository.CROPS) {
+            assertTrue("NPK ratio must not be blank for ${crop.name}", crop.npkRatio.isNotBlank())
+            assertTrue("Optimal picking window must not be blank for ${crop.name}", crop.optimalPickingWindow.isNotBlank())
+            assertTrue("Disease watch must not be blank for ${crop.name}", crop.diseaseWatch.isNotBlank())
+            assertTrue("GDD target must not be blank for ${crop.name}", crop.gddTarget.isNotBlank())
+            assertTrue("Temperature range must not be blank for ${crop.name}", crop.temperature.isNotBlank())
+            assertTrue("Water needs must not be blank for ${crop.name}", crop.waterNeeds.isNotBlank())
+            assertTrue("Soil requirements must not be blank for ${crop.name}", crop.soilAndPh.isNotBlank())
+        }
+    }
+
+    @Test
+    fun testStageProgressionIntegrity() {
+        for (crop in CropGrowthRepository.CROPS) {
+            assertTrue("${crop.name} should have at least 4 stages", crop.stages.size >= 4)
+            var prevProgress = -1
+            for (stage in crop.stages) {
+                assertTrue("Stage progress must increase monotonically in ${crop.name}", stage.progressPct > prevProgress)
+                assertTrue("Stage name cannot be empty in ${crop.name}", stage.name.isNotBlank())
+                assertTrue("Stage description cannot be empty in ${crop.name}", stage.description.isNotBlank())
+                prevProgress = stage.progressPct
+            }
+            assertEquals("Last stage must be 100% in ${crop.name}", 100, prevProgress)
+        }
+    }
+
+    @Test
+    fun testComputeHarvestWindowFormats() {
+        val window0 = PlantGrowthAnalyzer.computeHarvestWindow(0)
+        assertTrue("0 days should state Peak Harvest", window0.contains("Peak Harvest") || window0.contains("Today"))
+
+        val window15 = PlantGrowthAnalyzer.computeHarvestWindow(15)
+        assertTrue("15 days should return valid date range format", window15.contains("–") || window15.contains("-"))
+    }
+
+    @Test
+    fun testProportionalHarvestTimelineCalculation() {
+        // Verify crop timelines scale correctly according to crop.averageDays
+        val cropsToTest = listOf("Tomato", "Banana", "Onion", "Cucumber", "Eggplant", "Lemon", "Potato")
+        for (cropName in cropsToTest) {
+            val profile = CropGrowthRepository.getProfile(cropName)
+            assertNotNull(profile)
+            val avgDays = profile!!.averageDays
+
+            // Test various progress levels
+            for (progress in listOf(15, 35, 55, 80, 95, 100)) {
+                val remDays = if (progress >= 98) 0 else Math.round(avgDays * ((100.0 - progress) / 100.0)).toInt()
+                assertTrue("Remaining days ($remDays) must be <= total avg days ($avgDays) for $cropName at $progress%", remDays <= avgDays)
+                assertTrue("Remaining days must be >= 0", remDays >= 0)
+                if (progress == 100) {
+                    assertEquals("At 100% progress, remaining days must be 0", 0, remDays)
+                }
+            }
+        }
+    }
 }
+

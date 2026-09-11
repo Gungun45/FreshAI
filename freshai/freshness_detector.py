@@ -272,31 +272,38 @@ def _rgb_to_hsv(r: float, g: float, b: float) -> Tuple[float, float, float]:
 def _analyze_crop_hsv(img_pil: "Image.Image") -> Tuple[float, float, float, float, float, float, float]:
     """
     Analyse HSV and color distribution statistics of a produce crop.
-    Accurately distinguishes true black mold / fungal rot from natural dry peel / shading.
+    Accurately filters neutral background floor and distinguishes true black mold / fungal rot.
     Returns (mean_h, mean_s, mean_v, brown_ratio, green_ratio, yellow_ratio, spot_ratio).
     """
     img_small = img_pil.resize((64, 64)).convert("RGB")
     pixels = np.array(img_small).reshape(-1, 3).tolist()
-    total = len(pixels)
 
     h_sum = s_sum = v_sum = 0.0
     brown_count = 0
     green_count = 0
     yellow_count = 0
     spot_count = 0
+    valid_count = 0
 
     for (r, g, b) in pixels:
         h, s, v = _rgb_to_hsv(r, g, b)
+
+        # Skip neutral background floor/table (cement, light tiles, white/grey flat surfaces)
+        is_neutral_floor = (abs(r - g) < 14 and abs(g - b) < 14 and s < 0.15 and 0.20 <= v <= 0.96)
+        if is_neutral_floor:
+            continue
+
+        valid_count += 1
         h_sum += h
         s_sum += s
         v_sum += v
 
-        # True dark rot / black fungal mold (near-black or deep dark sunken spots)
-        if v < 0.18 or (v < 0.22 and s < 0.28):
+        # True dark rot / black fungal mold (Aspergillus niger, charcoal rot, sunken lesions)
+        if v < 0.22 or (v < 0.36 and s < 0.40 and r < 110 and g < 105 and b < 105):
             spot_count += 1
             brown_count += 1
-        # Discoloration / bruising (moderate browning on non-onion crops)
-        elif 12 <= h <= 35 and s > 0.35 and 0.22 <= v < 0.45:
+        # Discoloration / decay browning
+        elif 12 <= h <= 42 and s > 0.15 and 0.18 <= v < 0.42:
             brown_count += 1
         # Fresh green indicator
         elif 75 <= h <= 165 and s > 0.20 and v > 0.25:
@@ -305,13 +312,15 @@ def _analyze_crop_hsv(img_pil: "Image.Image") -> Tuple[float, float, float, floa
         elif 45 < h < 75 and s > 0.25 and v > 0.40:
             yellow_count += 1
 
-    mean_h = h_sum / total if total > 0 else 0.0
-    mean_s = s_sum / total if total > 0 else 0.0
-    mean_v = v_sum / total if total > 0 else 0.0
-    brown_ratio = brown_count / total if total > 0 else 0.0
-    green_ratio = green_count / total if total > 0 else 0.0
-    yellow_ratio = yellow_count / total if total > 0 else 0.0
-    spot_ratio = spot_count / total if total > 0 else 0.0
+    # Fallback if almost entire crop was filtered as background
+    total = max(1, valid_count)
+    mean_h = h_sum / total if valid_count > 0 else 0.0
+    mean_s = s_sum / total if valid_count > 0 else 0.0
+    mean_v = v_sum / total if valid_count > 0 else 0.0
+    brown_ratio = brown_count / total
+    green_ratio = green_count / total
+    yellow_ratio = yellow_count / total
+    spot_ratio = spot_count / total
 
     return mean_h, mean_s, mean_v, brown_ratio, green_ratio, yellow_ratio, spot_ratio
 
@@ -463,9 +472,19 @@ def estimate_freshness_heuristic(
             score = 2.0
             ripeness_idx = 2
         # Wrinkled / dark rotting spots
-        else:
-            score = 4.5
+    elif "garlic" in p_lower or "lehsun" in p_lower:
+        if spot_ratio >= 0.15 or brown_ratio >= 0.25:
+            score = 4.7  # Rotten / moldy cloves -> Spoiled
             ripeness_idx = 3
+        elif spot_ratio >= 0.06 or brown_ratio >= 0.12:
+            score = 3.6  # Softening / moldy blemish -> Deteriorating
+            ripeness_idx = 3
+        elif mean_s > 0.22 or mean_v < 0.40:
+            score = 2.2  # Aging / dried out
+            ripeness_idx = 2
+        else:
+            score = 0.5  # Clean ivory cloves -> Fresh
+            ripeness_idx = 1
 
     else:
         # General produce evaluation based on color vibrancy and surface degradation
